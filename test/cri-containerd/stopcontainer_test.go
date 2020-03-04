@@ -148,3 +148,52 @@ func Test_StopContainer_WithExec_LCOW(t *testing.T) {
 		Stdout: true,
 	})
 }
+
+func Test_StopContainer_ReusePod_LCOW(t *testing.T) {
+	pullRequiredLcowImages(t, []string{imageDotnetCoreVersion31, imageDotnetCoreVersion30})
+
+	client := newTestRuntimeClient(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sandboxRequest := &runtime.RunPodSandboxRequest{
+		Config: &runtime.PodSandboxConfig{
+			Metadata: &runtime.PodSandboxMetadata{
+				Name:      t.Name() + "-Sandbox",
+				Namespace: testNamespace,
+			},
+		},
+		RuntimeHandler: lcowRuntimeHandler,
+	}
+
+	podID := runPodSandbox(t, client, ctx, sandboxRequest)
+	defer removePodSandbox(t, client, ctx, podID)
+	defer stopPodSandbox(t, client, ctx, podID)
+
+	request := &runtime.CreateContainerRequest{
+		PodSandboxId: podID,
+		Config: &runtime.ContainerConfig{
+			Metadata: &runtime.ContainerMetadata{
+				Name: t.Name() + "-Container",
+			},
+			Image: &runtime.ImageSpec{
+				Image: imageDotnetCoreVersion30,
+			},
+			Command: []string{
+				"top",
+			},
+		},
+		SandboxConfig: sandboxRequest.Config,
+	}
+
+	containerID := createContainer(t, client, ctx, request)
+	startContainer(t, client, ctx, containerID)
+	stopContainer(t, client, ctx, containerID)
+	removeContainer(t, client, ctx, containerID)
+
+	request.Config.Image.Image = imageDotnetCoreVersion31
+	containerID = createContainer(t, client, ctx, request)
+	startContainer(t, client, ctx, containerID)
+	stopContainer(t, client, ctx, containerID)
+	removeContainer(t, client, ctx, containerID)
+}
