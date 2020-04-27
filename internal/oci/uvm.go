@@ -115,6 +115,8 @@ const (
 	// Note: Unlike Windows process isolated container QoS Count/Limt/Weight on
 	// the UVM are not mutually exclusive and can be set together.
 	annotationProcessorWeight            = "io.microsoft.virtualmachine.computetopology.processor.weight"
+	annotationDefaultNUMA                = "io.microsoft.virtualmachine.computetopology.numa.default"
+	annotationVirtualNodeSettings        = "io.microsoft.virtualmachine.computetopology.numa.settings"
 	annotationVPMemCount                 = "io.microsoft.virtualmachine.devices.virtualpmem.maximumcount"
 	annotationVPMemSize                  = "io.microsoft.virtualmachine.devices.virtualpmem.maximumsizebytes"
 	annotationPreferredRootFSType        = "io.microsoft.virtualmachine.lcow.preferredrootfstype"
@@ -268,6 +270,25 @@ func parseAnnotationsPreferredRootFSType(ctx context.Context, a map[string]strin
 	return def
 }
 
+// parseAnnotationsUint8 searches `a` for `key` and if found verifies that the
+// value is a 8 bit unsigned integer. If `key` is not found returns `def`.
+func parseAnnotationsUint8(ctx context.Context, a map[string]string, key string, def uint8) uint8 {
+	if v, ok := a[key]; ok {
+		countu, err := strconv.ParseUint(v, 10, 8)
+		if err == nil {
+			v := uint8(countu)
+			return v
+		}
+		log.G(ctx).WithFields(logrus.Fields{
+			logfields.OCIAnnotation: key,
+			logfields.Value:         v,
+			logfields.ExpectedType:  logfields.Uint32,
+			logrus.ErrorKey:         err,
+		}).Warning("annotation could not be parsed")
+	}
+	return def
+}
+
 // parseAnnotationsUint32 searches `a` for `key` and if found verifies that the
 // value is a 32 bit unsigned integer. If `key` is not found returns `def`.
 func parseAnnotationsUint32(ctx context.Context, a map[string]string, key string, def uint32) uint32 {
@@ -336,6 +357,10 @@ func SpecToUVMCreateOpts(ctx context.Context, s *specs.Spec, id, owner string) (
 		lopts.StorageQoSBandwidthMaximum = ParseAnnotationsStorageBps(ctx, s, annotationStorageQoSBandwidthMaximum, lopts.StorageQoSBandwidthMaximum)
 		lopts.StorageQoSIopsMaximum = ParseAnnotationsStorageIops(ctx, s, annotationStorageQoSIopsMaximum, lopts.StorageQoSIopsMaximum)
 		lopts.PreferredRootFSType = parseAnnotationsPreferredRootFSType(ctx, s.Annotations, annotationPreferredRootFSType, lopts.PreferredRootFSType)
+		lopts.DefaultNUMA = parseAnnotationsBool(ctx, s.Annotations, annotationDefaultNUMA, lopts.DefaultNUMA)
+		if v, ok := s.Annotations[annotationVirtualNodeSettings]; ok {
+			lopts.NUMATopologyJSON = v
+		}
 		switch lopts.PreferredRootFSType {
 		case uvm.PreferredRootFSTypeInitRd:
 			lopts.RootFSFile = uvm.InitrdFile
@@ -362,6 +387,10 @@ func SpecToUVMCreateOpts(ctx context.Context, s *specs.Spec, id, owner string) (
 		wopts.ProcessorWeight = ParseAnnotationsCPUWeight(ctx, s, annotationProcessorWeight, wopts.ProcessorWeight)
 		wopts.StorageQoSBandwidthMaximum = ParseAnnotationsStorageBps(ctx, s, annotationStorageQoSBandwidthMaximum, wopts.StorageQoSBandwidthMaximum)
 		wopts.StorageQoSIopsMaximum = ParseAnnotationsStorageIops(ctx, s, annotationStorageQoSIopsMaximum, wopts.StorageQoSIopsMaximum)
+		wopts.DefaultNUMA = parseAnnotationsBool(ctx, s.Annotations, annotationDefaultNUMA, wopts.DefaultNUMA)
+		if v, ok := s.Annotations[annotationVirtualNodeSettings]; ok {
+			wopts.NUMATopologyJSON = v
+		}
 		return wopts, nil
 	}
 	return nil, errors.New("cannot create UVM opts spec is not LCOW or WCOW")

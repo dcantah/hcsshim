@@ -47,6 +47,7 @@ type UtilityVM struct {
 	gcListener      net.Listener         // The GCS connection listener
 	gc              *gcs.GuestConnection // The GCS connection
 	processorCount  int32
+	memorySizeInMB  int32
 	m               sync.Mutex // Lock for adding/removing devices
 
 	exitErr error

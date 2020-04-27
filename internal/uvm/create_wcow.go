@@ -2,6 +2,8 @@ package uvm
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -17,6 +19,7 @@ import (
 	"github.com/Microsoft/hcsshim/internal/schemaversion"
 	"github.com/Microsoft/hcsshim/internal/uvmfolder"
 	"github.com/Microsoft/hcsshim/internal/wcow"
+	"github.com/Microsoft/hcsshim/osversion"
 	"go.opencensus.io/trace"
 )
 
@@ -75,15 +78,52 @@ func CreateWCOW(ctx context.Context, opts *OptionsWCOW) (_ *UtilityVM, err error
 		}
 	}()
 
+	processorTopology, err := uvm.hostProcessorInfo(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get host processor information: %s", err)
+	}
 	// To maintain compatability with Docker we need to automatically downgrade
 	// a user CPU count if the setting is not possible.
-	uvm.normalizeProcessorCount(ctx, opts.ProcessorCount)
-
+	uvm.normalizeProcessorCount(ctx, opts.ProcessorCount, processorTopology)
 	// Align the requested memory size.
-	memorySizeInMB := uvm.normalizeMemorySize(ctx, opts.MemorySizeInMB)
+	uvm.normalizeMemorySize(ctx, opts.MemorySizeInMB)
 
-	if len(opts.LayerFolders) < 2 {
-		return nil, fmt.Errorf("at least 2 LayerFolders must be supplied")
+	// If default NUMA configuration was specified and no topology settings were
+	// passed create a Numa struct with the hosts node count and nothing more to
+	// let Hyper-V decide how to split the resources. If topology settings were
+	// passed in, try and unmarshal into hcsschema.Numa and do the validations we
+	// can perform on our side to fail early.
+	numa := &hcsschema.Numa{}
+
+	// ProcessorTopology includes the logical processor count and the node mappings
+	// of LPs sequentially. By reading the last entries 'NodeNumber' field
+	// (0 indexed) and adding 1 we can get the hosts node count.
+	index := len(processorTopology.LogicalProcessors) - 1
+	numNodes := processorTopology.LogicalProcessors[index].NodeNumber + 1
+	if opts.DefaultNUMA && opts.NUMATopologyJSON == "" {
+		numa.VirtualNodeCount = numNodes
+	} else if opts.NUMATopologyJSON != "" {
+		if err := json.Unmarshal([]byte(opts.NUMATopologyJSON), numa); err != nil {
+			return nil, fmt.Errorf("failed to parse NUMA topology: %s", err)
+		}
+		// If client didn't specify a node count set it to the hosts amount.
+		if numa.VirtualNodeCount == 0 {
+			numa.VirtualNodeCount = numNodes
+		}
+		// If settings were provided validate the topology passed in or error if
+		// before the build that supports this.
+		if len(numa.Settings) != 0 {
+			if osversion.Get().Build < 18943 {
+				return nil, errors.New("Per virtual node settings are not supported on builds older than 18943")
+			}
+			if err := uvm.validateNUMATopology(processorTopology, numa); err != nil {
+				return nil, fmt.Errorf("NUMA topology validation failed: %s", err)
+			}
+		}
+	}
+
+	if err := verifyOptions(ctx, opts); err != nil {
+		return nil, fmt.Errorf("UVM options incorrect or unsupported: %s", err)
 	}
 	uvmFolder, err := uvmfolder.LocateUVMFolder(ctx, opts.LayerFolders)
 	if err != nil {
@@ -129,7 +169,7 @@ func CreateWCOW(ctx context.Context, opts *OptionsWCOW) (_ *UtilityVM, err error
 			},
 			ComputeTopology: &hcsschema.Topology{
 				Memory: &hcsschema.Memory2{
-					SizeInMB:        memorySizeInMB,
+					SizeInMB:        uvm.memorySizeInMB,
 					AllowOvercommit: opts.AllowOvercommit,
 					// EnableHotHint is not compatible with physical.
 					EnableHotHint:        opts.AllowOvercommit,
@@ -143,6 +183,7 @@ func CreateWCOW(ctx context.Context, opts *OptionsWCOW) (_ *UtilityVM, err error
 					Limit:  opts.ProcessorLimit,
 					Weight: opts.ProcessorWeight,
 				},
+				Numa: numa,
 			},
 			Devices: &hcsschema.Devices{
 				Scsi: map[string]hcsschema.Scsi{

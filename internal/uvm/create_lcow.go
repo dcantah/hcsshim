@@ -2,6 +2,8 @@ package uvm
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -172,12 +174,49 @@ func CreateLCOW(ctx context.Context, opts *OptionsLCOW) (_ *UtilityVM, err error
 		}
 	}()
 
+	processorTopology, err := uvm.hostProcessorInfo(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get host processor information: %s", err)
+	}
 	// To maintain compatability with Docker we need to automatically downgrade
 	// a user CPU count if the setting is not possible.
-	uvm.normalizeProcessorCount(ctx, opts.ProcessorCount)
-
+	uvm.normalizeProcessorCount(ctx, opts.ProcessorCount, processorTopology)
 	// Align the requested memory size.
-	memorySizeInMB := uvm.normalizeMemorySize(ctx, opts.MemorySizeInMB)
+	uvm.normalizeMemorySize(ctx, opts.MemorySizeInMB)
+
+	// If default NUMA configuration was specified and no topology settings were
+	// passed create a Numa struct with the hosts node count and nothing more to
+	// let Hyper-V decide how to split the resources. If topology settings were
+	// passed in, try and unmarshal into hcsschema.Numa and do the validations we
+	// can perform on our side to fail early.
+	numa := &hcsschema.Numa{}
+
+	// ProcessorTopology includes the logical processor count and the node mappings
+	// of LPs sequentially. By reading the last entries 'NodeNumber' field
+	// (0 indexed) and adding 1 we can get the hosts node count.
+	index := len(processorTopology.LogicalProcessors) - 1
+	numNodes := processorTopology.LogicalProcessors[index].NodeNumber + 1
+	if opts.DefaultNUMA && opts.NUMATopologyJSON == "" {
+		numa.VirtualNodeCount = numNodes
+	} else if opts.NUMATopologyJSON != "" {
+		if err := json.Unmarshal([]byte(opts.NUMATopologyJSON), numa); err != nil {
+			return nil, fmt.Errorf("failed to parse NUMA topology: %s", err)
+		}
+		// If client didn't specify a node count set it to the hosts amount.
+		if numa.VirtualNodeCount == 0 {
+			numa.VirtualNodeCount = numNodes
+		}
+		// If settings were provided validate the topology passed in or error if
+		// before the build that supports this.
+		if len(numa.Settings) != 0 {
+			if osversion.Get().Build < 18943 {
+				return nil, errors.New("Per virtual node settings are not supported on builds older than 18943")
+			}
+			if err := uvm.validateNUMATopology(processorTopology, numa); err != nil {
+				return nil, fmt.Errorf("NUMA topology validation failed: %s", err)
+			}
+		}
+	}
 
 	kernelFullPath := filepath.Join(opts.BootFilesPath, opts.KernelFile)
 	if _, err := os.Stat(kernelFullPath); os.IsNotExist(err) {
@@ -188,27 +227,8 @@ func CreateLCOW(ctx context.Context, opts *OptionsLCOW) (_ *UtilityVM, err error
 		return nil, fmt.Errorf("boot file: '%s' not found", rootfsFullPath)
 	}
 
-	if opts.SCSIControllerCount > 1 {
-		return nil, fmt.Errorf("SCSI controller count must be 0 or 1") // Future extension here for up to 4
-	}
-	if opts.VPMemDeviceCount > MaxVPMEMCount {
-		return nil, fmt.Errorf("vpmem device count cannot be greater than %d", MaxVPMEMCount)
-	}
-	if uvm.vpmemMaxCount > 0 {
-		if opts.VPMemSizeBytes%4096 != 0 {
-			return nil, fmt.Errorf("opts.VPMemSizeBytes must be a multiple of 4096")
-		}
-	} else {
-		if opts.PreferredRootFSType == PreferredRootFSTypeVHD {
-			return nil, fmt.Errorf("PreferredRootFSTypeVHD requires at least one VPMem device")
-		}
-	}
-	if opts.KernelDirect && osversion.Get().Build < 18286 {
-		return nil, fmt.Errorf("KernelDirectBoot is not support on builds older than 18286")
-	}
-
-	if opts.EnableColdDiscardHint && osversion.Get().Build < 18967 {
-		return nil, fmt.Errorf("EnableColdDiscardHint is not supported on builds older than 18967")
+	if err := verifyOptions(ctx, opts); err != nil {
+		return nil, fmt.Errorf("UVM options incorrect or unsupported: %s", err)
 	}
 
 	doc := &hcsschema.ComputeSystem{
@@ -220,7 +240,7 @@ func CreateLCOW(ctx context.Context, opts *OptionsLCOW) (_ *UtilityVM, err error
 			Chipset:     &hcsschema.Chipset{},
 			ComputeTopology: &hcsschema.Topology{
 				Memory: &hcsschema.Memory2{
-					SizeInMB:              memorySizeInMB,
+					SizeInMB:              uvm.memorySizeInMB,
 					AllowOvercommit:       opts.AllowOvercommit,
 					EnableDeferredCommit:  opts.EnableDeferredCommit,
 					EnableColdDiscardHint: opts.EnableColdDiscardHint,
@@ -233,6 +253,7 @@ func CreateLCOW(ctx context.Context, opts *OptionsLCOW) (_ *UtilityVM, err error
 					Limit:  opts.ProcessorLimit,
 					Weight: opts.ProcessorWeight,
 				},
+				Numa: numa,
 			},
 			Devices: &hcsschema.Devices{
 				HvSocket: &hcsschema.HvSocket2{
