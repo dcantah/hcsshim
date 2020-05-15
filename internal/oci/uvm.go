@@ -124,6 +124,7 @@ const (
 	annotationStorageQoSBandwidthMaximum = "io.microsoft.virtualmachine.storageqos.bandwidthmaximum"
 	annotationStorageQoSIopsMaximum      = "io.microsoft.virtualmachine.storageqos.iopsmaximum"
 	annotationFullyPhysicallyBacked      = "io.microsoft.virtualmachine.fullyphysicallybacked"
+	annotationNetworkConfigProxy         = "io.microsoft.ncproxy"
 )
 
 // parseAnnotationsBool searches `a` for `key` and if found verifies that the
@@ -379,6 +380,7 @@ func SpecToUVMCreateOpts(ctx context.Context, s *specs.Spec, id, owner string) (
 		lopts.StorageQoSIopsMaximum = ParseAnnotationsStorageIops(ctx, s, annotationStorageQoSIopsMaximum, lopts.StorageQoSIopsMaximum)
 		lopts.VPCIEnabled = parseAnnotationsBool(ctx, s.Annotations, annotationVPCIEnabled, lopts.VPCIEnabled)
 		lopts.BootFilesPath = parseAnnotationsString(s.Annotations, annotationBootFilesRootPath, lopts.BootFilesPath)
+		lopts.NetworkConfigProxy = parseAnnotationsString(s.Annotations, annotationNetworkConfigProxy, lopts.NetworkConfigProxy)
 		handleAnnotationPreferredRootFSType(ctx, s.Annotations, lopts)
 		handleAnnotationKernelDirectBoot(ctx, s.Annotations, lopts)
 
@@ -399,6 +401,7 @@ func SpecToUVMCreateOpts(ctx context.Context, s *specs.Spec, id, owner string) (
 		wopts.ProcessorWeight = ParseAnnotationsCPUWeight(ctx, s, annotationProcessorWeight, wopts.ProcessorWeight)
 		wopts.StorageQoSBandwidthMaximum = ParseAnnotationsStorageBps(ctx, s, annotationStorageQoSBandwidthMaximum, wopts.StorageQoSBandwidthMaximum)
 		wopts.StorageQoSIopsMaximum = ParseAnnotationsStorageIops(ctx, s, annotationStorageQoSIopsMaximum, wopts.StorageQoSIopsMaximum)
+		wopts.NetworkConfigProxy = parseAnnotationsString(s.Annotations, annotationNetworkConfigProxy, wopts.NetworkConfigProxy)
 		handleAnnotationFullyPhysicallyBacked(ctx, s.Annotations, wopts)
 		return wopts, nil
 	}
