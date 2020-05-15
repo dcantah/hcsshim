@@ -64,10 +64,14 @@ message Options {
 	// when a container requests a gpu
 	string GPUVHDPath = 10;
 
-        // scale_cpu_limits_to_sandbox indicates that container CPU limits should
-        // be adjusted to account for the difference in number of cores between the
-        // host and UVM.
-        bool scale_cpu_limits_to_sandbox = 11;
+	// scale_cpu_limits_to_sandbox indicates that container CPU limits should
+	// be adjusted to account for the difference in number of cores between the
+	// host and UVM.
+	bool scale_cpu_limits_to_sandbox = 11;
+
+	//NCProxyAddr is the address of the network configuration proxy service. If omitted 
+	// the network is setup locally. 
+	string NCProxyAddr = 12; 
 }
 
 // ProcessDetails contains additional information about a process. This is the additional

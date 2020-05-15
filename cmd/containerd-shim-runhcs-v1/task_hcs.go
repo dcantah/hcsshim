@@ -96,7 +96,7 @@ func newHcsStandaloneTask(ctx context.Context, events publisher, req *task.Creat
 		return nil, errors.Wrap(errdefs.ErrFailedPrecondition, "oci spec does not contain WCOW or LCOW spec")
 	}
 
-	shim, err := newHcsTask(ctx, events, parent, true, req, s)
+	shim, err := newHcsTask(ctx, events, parent, true, req, s, nil)
 	if err != nil {
 		if parent != nil {
 			parent.Close()
@@ -116,7 +116,8 @@ func newHcsTask(
 	parent *uvm.UtilityVM,
 	ownsParent bool,
 	req *task.CreateTaskRequest,
-	s *specs.Spec) (_ shimTask, err error) {
+	s *specs.Spec,
+	netSetup hcsoci.NetworkSetup) (_ shimTask, err error) {
 	log.G(ctx).WithFields(logrus.Fields{
 		"tid":        req.ID,
 		"ownsParent": ownsParent,
@@ -151,6 +152,7 @@ func newHcsTask(
 		HostingSystem:           parent,
 		NetworkNamespace:        netNS,
 		ScaleCPULimitsToSandbox: shimOpts.ScaleCpuLimitsToSandbox,
+		NetSetup:                netSetup,
 	}
 	system, resources, err := hcsoci.CreateContainer(ctx, &opts)
 	if err != nil {
