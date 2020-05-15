@@ -14,6 +14,7 @@ import (
 	"github.com/Microsoft/hcsshim/internal/cow"
 	"github.com/Microsoft/hcsshim/internal/hcs"
 	"github.com/Microsoft/hcsshim/internal/log"
+	"github.com/Microsoft/hcsshim/internal/ncproxyttrpc"
 	"github.com/Microsoft/hcsshim/internal/oci"
 	hcsschema "github.com/Microsoft/hcsshim/internal/schema2"
 	"github.com/Microsoft/hcsshim/internal/schemaversion"
@@ -146,19 +147,45 @@ func CreateContainer(ctx context.Context, createOptions *CreateOptions) (_ cow.C
 			// container but not a workload container in a sandbox that inherits
 			// the namespace.
 			if ct == oci.KubernetesContainerTypeNone || ct == oci.KubernetesContainerTypeSandbox {
-				endpoints, err := GetNamespaceEndpoints(ctx, coi.actualNetworkNamespace)
-				if err != nil {
-					return nil, resources, err
-				}
-				err = coi.HostingSystem.AddNetNS(ctx, coi.actualNetworkNamespace)
-				if err != nil {
-					return nil, resources, err
-				}
-				err = coi.HostingSystem.AddEndpointsToNS(ctx, coi.actualNetworkNamespace, endpoints)
-				if err != nil {
-					// Best effort clean up the NS
-					coi.HostingSystem.RemoveNetNS(ctx, coi.actualNetworkNamespace)
-					return nil, resources, err
+				// If ncproxy is enabled and this is a sandbox container setup the network
+				// using Ncproxy.
+				if coi.HostingSystem.NCProxyEnabled() && ct == oci.KubernetesContainerTypeSandbox {
+					err = coi.HostingSystem.AddNetNS(ctx, coi.actualNetworkNamespace)
+					if err != nil {
+						return nil, resources, err
+					}
+					client := coi.HostingSystem.NCProxyClient()
+					registerReq := &ncproxyttrpc.RegisterComputeAgentRequest{
+						NamespaceID:  coi.actualNetworkNamespace,
+						AgentAddress: fmt.Sprintf("\\\\.\\pipe\\computeagent-%s", coi.HostingSystem.ID()),
+					}
+					_, err = client.RegisterComputeAgent(ctx, registerReq)
+					if err != nil {
+						return nil, resources, err
+					}
+					nsReq := &ncproxyttrpc.ConfigureNamespaceRequest{
+						NamespaceID: coi.actualNetworkNamespace,
+					}
+					_, err = client.ConfigureNamespace(ctx, nsReq)
+					if err != nil {
+						coi.HostingSystem.RemoveNetNS(ctx, coi.actualNetworkNamespace)
+						return nil, resources, err
+					}
+				} else {
+					endpoints, err := GetNamespaceEndpoints(ctx, coi.actualNetworkNamespace)
+					if err != nil {
+						return nil, resources, err
+					}
+					err = coi.HostingSystem.AddNetNS(ctx, coi.actualNetworkNamespace)
+					if err != nil {
+						return nil, resources, err
+					}
+					err = coi.HostingSystem.AddEndpointsToNS(ctx, coi.actualNetworkNamespace, endpoints)
+					if err != nil {
+						// Best effort clean up the NS
+						coi.HostingSystem.RemoveNetNS(ctx, coi.actualNetworkNamespace)
+						return nil, resources, err
+					}
 				}
 				resources.addedNetNSToVM = true
 			}

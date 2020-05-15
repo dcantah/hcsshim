@@ -128,6 +128,7 @@ const (
 	// HCS-GCS bridge. Default value is true which means external bridge will be used
 	// by default.
 	annotationUseExternalGCSBridge = "io.microsoft.virtualmachine.useexternalgcsbridge"
+	annotationNetworkConfigProxy   = "io.microsoft.network.ncproxy"
 )
 
 // parseAnnotationsBool searches `a` for `key` and if found verifies that the
@@ -384,6 +385,7 @@ func SpecToUVMCreateOpts(ctx context.Context, s *specs.Spec, id, owner string) (
 		lopts.VPCIEnabled = parseAnnotationsBool(ctx, s.Annotations, annotationVPCIEnabled, lopts.VPCIEnabled)
 		lopts.BootFilesPath = parseAnnotationsString(s.Annotations, annotationBootFilesRootPath, lopts.BootFilesPath)
 		lopts.ExternalGuestConnection = parseAnnotationsBool(ctx, s.Annotations, annotationUseExternalGCSBridge, lopts.ExternalGuestConnection)
+		lopts.NetworkConfigProxy = parseAnnotationsString(s.Annotations, annotationNetworkConfigProxy, lopts.NetworkConfigProxy)
 		handleAnnotationPreferredRootFSType(ctx, s.Annotations, lopts)
 		handleAnnotationKernelDirectBoot(ctx, s.Annotations, lopts)
 
@@ -405,6 +407,7 @@ func SpecToUVMCreateOpts(ctx context.Context, s *specs.Spec, id, owner string) (
 		wopts.StorageQoSBandwidthMaximum = ParseAnnotationsStorageBps(ctx, s, annotationStorageQoSBandwidthMaximum, wopts.StorageQoSBandwidthMaximum)
 		wopts.StorageQoSIopsMaximum = ParseAnnotationsStorageIops(ctx, s, annotationStorageQoSIopsMaximum, wopts.StorageQoSIopsMaximum)
 		wopts.ExternalGuestConnection = parseAnnotationsBool(ctx, s.Annotations, annotationUseExternalGCSBridge, wopts.ExternalGuestConnection)
+		wopts.NetworkConfigProxy = parseAnnotationsString(s.Annotations, annotationNetworkConfigProxy, wopts.NetworkConfigProxy)
 		handleAnnotationFullyPhysicallyBacked(ctx, s.Annotations, wopts)
 		return wopts, nil
 	}
@@ -432,6 +435,10 @@ func UpdateSpecFromOptions(s specs.Spec, opts *runhcsopts.Options) specs.Spec {
 
 	if _, ok := s.Annotations[AnnotationGPUVHDPath]; !ok && opts.GPUVHDPath != "" {
 		s.Annotations[AnnotationGPUVHDPath] = opts.GPUVHDPath
+	}
+
+	if _, ok := s.Annotations[annotationNetworkConfigProxy]; !ok && opts.NCProxyAddr != "" {
+		s.Annotations[annotationNetworkConfigProxy] = opts.NCProxyAddr
 	}
 
 	return s

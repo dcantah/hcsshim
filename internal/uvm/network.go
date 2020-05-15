@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/Microsoft/hcsshim/internal/ncproxyttrpc"
+
 	"github.com/Microsoft/go-winio/pkg/guid"
 	"github.com/Microsoft/hcsshim/hcn"
 	"github.com/Microsoft/hcsshim/internal/guestrequest"
@@ -25,6 +27,16 @@ var (
 	// network namespace by this id.
 	ErrNetNSNotFound = errors.New("network namespace not found")
 )
+
+// NCProxyEnabled returns if there is a network configuration client.
+func (uvm *UtilityVM) NCProxyEnabled() bool {
+	return uvm.ncProxyClient != nil
+}
+
+// NCProxyClient returns the network configuration proxy client.
+func (uvm *UtilityVM) NCProxyClient() ncproxyttrpc.NetworkConfigProxyService {
+	return uvm.ncProxyClient
+}
 
 // NetworkEndpoints is a struct containing all of the endpoint IDs of a network
 // namespace.
@@ -96,6 +108,29 @@ func (uvm *UtilityVM) AddNetNS(ctx context.Context, id string) error {
 	return nil
 }
 
+// AddEndpointToNS adds an ednpoint to the network namespace with the specified
+// NIC ID.
+//
+// If no network namespace matches `id` returns `ErrNetNSNotFound`.
+func (uvm *UtilityVM) AddEndpointToNS(ctx context.Context, nsID, nicID string, endpoint *hns.HNSEndpoint) error {
+	uvm.m.Lock()
+	defer uvm.m.Unlock()
+	ns, ok := uvm.namespaces[nsID]
+	if !ok {
+		return ErrNetNSNotFound
+	}
+	if _, ok := ns.nics[endpoint.Id]; !ok {
+		if err := uvm.addNIC(ctx, nicID, endpoint); err != nil {
+			return err
+		}
+		ns.nics[endpoint.Id] = &nicInfo{
+			ID:       nicID,
+			Endpoint: endpoint,
+		}
+	}
+	return nil
+}
+
 // AddEndpointsToNS adds all unique `endpoints` to the network namespace
 // matching `id`. On failure does not roll back any previously successfully
 // added endpoints.
@@ -116,11 +151,11 @@ func (uvm *UtilityVM) AddEndpointsToNS(ctx context.Context, id string, endpoints
 			if err != nil {
 				return err
 			}
-			if err := uvm.addNIC(ctx, nicID, endpoint); err != nil {
+			if err := uvm.addNIC(ctx, nicID.String(), endpoint); err != nil {
 				return err
 			}
 			ns.nics[endpoint.Id] = &nicInfo{
-				ID:       nicID,
+				ID:       nicID.String(),
 				Endpoint: endpoint,
 			}
 		}
@@ -211,7 +246,8 @@ func getNetworkModifyRequest(adapterID string, requestType string, settings inte
 	}
 }
 
-func (uvm *UtilityVM) addNIC(ctx context.Context, id guid.GUID, endpoint *hns.HNSEndpoint) error {
+// addNIC adds a nic to the Utility VM.
+func (uvm *UtilityVM) addNIC(ctx context.Context, id string, endpoint *hns.HNSEndpoint) error {
 	// First a pre-add. This is a guest-only request and is only done on Windows.
 	if uvm.operatingSystem == "windows" {
 		preAddRequest := hcsschema.ModifySettingRequest{
@@ -219,7 +255,7 @@ func (uvm *UtilityVM) addNIC(ctx context.Context, id guid.GUID, endpoint *hns.HN
 				ResourceType: guestrequest.ResourceTypeNetwork,
 				RequestType:  requesttype.Add,
 				Settings: getNetworkModifyRequest(
-					id.String(),
+					id,
 					requesttype.PreAdd,
 					endpoint),
 			},
@@ -232,7 +268,7 @@ func (uvm *UtilityVM) addNIC(ctx context.Context, id guid.GUID, endpoint *hns.HN
 	// Then the Add itself
 	request := hcsschema.ModifySettingRequest{
 		RequestType:  requesttype.Add,
-		ResourcePath: fmt.Sprintf(networkResourceFormat, id.String()),
+		ResourcePath: fmt.Sprintf(networkResourceFormat, id),
 		Settings: hcsschema.NetworkAdapter{
 			EndpointId: endpoint.Id,
 			MacAddress: endpoint.MacAddress,
@@ -244,7 +280,7 @@ func (uvm *UtilityVM) addNIC(ctx context.Context, id guid.GUID, endpoint *hns.HN
 			ResourceType: guestrequest.ResourceTypeNetwork,
 			RequestType:  requesttype.Add,
 			Settings: getNetworkModifyRequest(
-				id.String(),
+				id,
 				requesttype.Add,
 				nil),
 		}
@@ -256,7 +292,7 @@ func (uvm *UtilityVM) addNIC(ctx context.Context, id guid.GUID, endpoint *hns.HN
 				RequestType:  requesttype.Add,
 				Settings: &guestrequest.LCOWNetworkAdapter{
 					NamespaceID:     endpoint.Namespace.ID,
-					ID:              id.String(),
+					ID:              id,
 					MacAddress:      endpoint.MacAddress,
 					IPAddress:       endpoint.IPAddress.String(),
 					PrefixLength:    endpoint.PrefixLength,
@@ -277,10 +313,10 @@ func (uvm *UtilityVM) addNIC(ctx context.Context, id guid.GUID, endpoint *hns.HN
 	return nil
 }
 
-func (uvm *UtilityVM) removeNIC(ctx context.Context, id guid.GUID, endpoint *hns.HNSEndpoint) error {
+func (uvm *UtilityVM) removeNIC(ctx context.Context, id string, endpoint *hns.HNSEndpoint) error {
 	request := hcsschema.ModifySettingRequest{
 		RequestType:  requesttype.Remove,
-		ResourcePath: fmt.Sprintf(networkResourceFormat, id.String()),
+		ResourcePath: fmt.Sprintf(networkResourceFormat, id),
 		Settings: hcsschema.NetworkAdapter{
 			EndpointId: endpoint.Id,
 			MacAddress: endpoint.MacAddress,
@@ -291,7 +327,7 @@ func (uvm *UtilityVM) removeNIC(ctx context.Context, id guid.GUID, endpoint *hns
 		request.GuestRequest = hcsschema.ModifySettingRequest{
 			RequestType: requesttype.Remove,
 			Settings: getNetworkModifyRequest(
-				id.String(),
+				id,
 				requesttype.Remove,
 				nil),
 		}
