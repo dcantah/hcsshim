@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"strings"
 	"sync"
 	"time"
 
@@ -22,7 +21,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"go.opencensus.io/trace"
-	"golang.org/x/sys/windows"
 )
 
 const (
@@ -372,6 +370,7 @@ func (he *hcsExec) ForceExit(ctx context.Context, status int) {
 // We DO NOT send the async `TaskExit` event because we never would have sent
 // the `TaskStart`/`TaskExecStarted` event.
 func (he *hcsExec) exitFromCreatedL(ctx context.Context, status int) {
+
 	if he.state != shimExecStateExited {
 		// Avoid logging the force if we already exited gracefully
 		log.G(ctx).WithField("status", status).Debug("hcsExec::exitFromCreatedL")
@@ -428,7 +427,9 @@ func (he *hcsExec) waitForExit() {
 
 	// Issue the process cancellation to unblock the container wait as early as
 	// possible.
-	he.processDoneOnce.Do(func() { close(he.processDone) })
+	he.processDoneOnce.Do(func() {
+		close(he.processDone)
+	})
 
 	code, err := he.p.Process.ExitCode()
 	if err != nil {
@@ -502,14 +503,6 @@ func (he *hcsExec) waitForContainerExit() {
 	case <-he.processDone:
 		// Process exited first. This is the normal case do nothing because
 		// `he.waitForExit` will release any waiters.
-	}
-}
 
-// escapeArgs makes a Windows-style escaped command line from a set of arguments
-func escapeArgs(args []string) string {
-	escapedArgs := make([]string, len(args))
-	for i, a := range args {
-		escapedArgs[i] = windows.EscapeArg(a)
 	}
-	return strings.Join(escapedArgs, " ")
 }
