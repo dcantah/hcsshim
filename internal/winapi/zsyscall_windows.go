@@ -41,7 +41,7 @@ var (
 	modkernel32 = windows.NewLazySystemDLL("kernel32.dll")
 	modntdll    = windows.NewLazySystemDLL("ntdll.dll")
 	modadvapi32 = windows.NewLazySystemDLL("advapi32.dll")
-	modpsapi    = windows.NewLazySystemDLL("psapi.dll")
+	modAdvapi32 = windows.NewLazySystemDLL("Advapi32.dll")
 	modcfgmgr32 = windows.NewLazySystemDLL("cfgmgr32.dll")
 
 	procSetJobCompartmentId                    = modiphlpapi.NewProc("SetJobCompartmentId")
@@ -59,8 +59,13 @@ var (
 	procRtlMoveMemory                          = modkernel32.NewProc("RtlMoveMemory")
 	procLocalAlloc                             = modkernel32.NewProc("LocalAlloc")
 	procLocalFree                              = modkernel32.NewProc("LocalFree")
-	procQueryWorkingSet                        = modpsapi.NewProc("QueryWorkingSet")
-	procGetProcessImageFileNameW               = modkernel32.NewProc("GetProcessImageFileNameW")
+	procGetProcessHeap                         = modkernel32.NewProc("GetProcessHeap")
+	procHeapAlloc                              = modkernel32.NewProc("HeapAlloc")
+	procHeapFree                               = modkernel32.NewProc("HeapFree")
+	procCreateProcessAsUserW                   = modAdvapi32.NewProc("CreateProcessAsUserW")
+	procInitializeProcThreadAttributeList      = modkernel32.NewProc("InitializeProcThreadAttributeList")
+	procUpdateProcThreadAttribute              = modkernel32.NewProc("UpdateProcThreadAttribute")
+	procDeleteProcThreadAttributeList          = modkernel32.NewProc("DeleteProcThreadAttributeList")
 	procGetActiveProcessorCount                = modkernel32.NewProc("GetActiveProcessorCount")
 	procCM_Get_Device_ID_List_SizeA            = modcfgmgr32.NewProc("CM_Get_Device_ID_List_SizeA")
 	procCM_Get_Device_ID_ListA                 = modcfgmgr32.NewProc("CM_Get_Device_ID_ListA")
@@ -235,8 +240,34 @@ func LocalFree(ptr uintptr) {
 	return
 }
 
-func QueryWorkingSet(handle windows.Handle, pv uintptr, cb uint32) (err error) {
-	r1, _, e1 := syscall.Syscall(procQueryWorkingSet.Addr(), 3, uintptr(handle), uintptr(pv), uintptr(cb))
+func GetProcessHeap() (procHeap windows.Handle, err error) {
+	r0, _, e1 := syscall.Syscall(procGetProcessHeap.Addr(), 0, 0, 0, 0)
+	procHeap = windows.Handle(r0)
+	if procHeap == 0 {
+		if e1 != 0 {
+			err = errnoErr(e1)
+		} else {
+			err = syscall.EINVAL
+		}
+	}
+	return
+}
+
+func HeapAlloc(hHeap windows.Handle, dwFlags uint32, dwBytes uintptr) (lpMem uintptr, err error) {
+	r0, _, e1 := syscall.Syscall(procHeapAlloc.Addr(), 3, uintptr(hHeap), uintptr(dwFlags), uintptr(dwBytes))
+	lpMem = uintptr(r0)
+	if lpMem == 0 {
+		if e1 != 0 {
+			err = errnoErr(e1)
+		} else {
+			err = syscall.EINVAL
+		}
+	}
+	return
+}
+
+func HeapFree(hHeap windows.Handle, dwFlags uint32, lpMem uintptr) (err error) {
+	r1, _, e1 := syscall.Syscall(procHeapFree.Addr(), 3, uintptr(hHeap), uintptr(dwFlags), uintptr(lpMem))
 	if r1 == 0 {
 		if e1 != 0 {
 			err = errnoErr(e1)
@@ -247,16 +278,50 @@ func QueryWorkingSet(handle windows.Handle, pv uintptr, cb uint32) (err error) {
 	return
 }
 
-func GetProcessImageFileName(hProcess windows.Handle, imageFileName *uint16, nSize uint32) (size uint32, err error) {
-	r0, _, e1 := syscall.Syscall(procGetProcessImageFileNameW.Addr(), 3, uintptr(hProcess), uintptr(unsafe.Pointer(imageFileName)), uintptr(nSize))
-	size = uint32(r0)
-	if size == 0 {
+func CreateProcessAsUser(hToken windows.Token, appName *uint16, commandLine *uint16, procSecurity *windows.SecurityAttributes, threadSecurity *windows.SecurityAttributes, inheritHandles bool, creationFlags uint32, env *uint16, currentDir *uint16, startupInfo *windows.StartupInfo, outProcInfo *windows.ProcessInformation) (err error) {
+	var _p0 uint32
+	if inheritHandles {
+		_p0 = 1
+	} else {
+		_p0 = 0
+	}
+	r1, _, e1 := syscall.Syscall12(procCreateProcessAsUserW.Addr(), 11, uintptr(hToken), uintptr(unsafe.Pointer(appName)), uintptr(unsafe.Pointer(commandLine)), uintptr(unsafe.Pointer(procSecurity)), uintptr(unsafe.Pointer(threadSecurity)), uintptr(_p0), uintptr(creationFlags), uintptr(unsafe.Pointer(env)), uintptr(unsafe.Pointer(currentDir)), uintptr(unsafe.Pointer(startupInfo)), uintptr(unsafe.Pointer(outProcInfo)), 0)
+	if r1 == 0 {
 		if e1 != 0 {
 			err = errnoErr(e1)
 		} else {
 			err = syscall.EINVAL
 		}
 	}
+	return
+}
+
+func InitializeProcThreadAttributeList(lpAttributeList uintptr, dwAttributeCount uint32, dwFlags uint32, lpSize *uintptr) (err error) {
+	r1, _, e1 := syscall.Syscall6(procInitializeProcThreadAttributeList.Addr(), 4, uintptr(lpAttributeList), uintptr(dwAttributeCount), uintptr(dwFlags), uintptr(unsafe.Pointer(lpSize)), 0, 0)
+	if r1 == 0 {
+		if e1 != 0 {
+			err = errnoErr(e1)
+		} else {
+			err = syscall.EINVAL
+		}
+	}
+	return
+}
+
+func UpdateProcThreadAttribute(lpAttributeList uintptr, dwFlags uint32, attribute uintptr, lpValue *uintptr, cbSize uintptr, lpPreviousValue *uintptr, lpReturnSize *uintptr) (err error) {
+	r1, _, e1 := syscall.Syscall9(procUpdateProcThreadAttribute.Addr(), 7, uintptr(lpAttributeList), uintptr(dwFlags), uintptr(attribute), uintptr(unsafe.Pointer(lpValue)), uintptr(cbSize), uintptr(unsafe.Pointer(lpPreviousValue)), uintptr(unsafe.Pointer(lpReturnSize)), 0, 0)
+	if r1 == 0 {
+		if e1 != 0 {
+			err = errnoErr(e1)
+		} else {
+			err = syscall.EINVAL
+		}
+	}
+	return
+}
+
+func DeleteProcThreadAttributeList(lpAttributeList uintptr) {
+	syscall.Syscall(procDeleteProcThreadAttributeList.Addr(), 1, uintptr(lpAttributeList), 0, 0)
 	return
 }
 

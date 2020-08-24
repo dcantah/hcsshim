@@ -10,18 +10,22 @@ package winapi
 //sys LocalAlloc(flags uint32, size int) (ptr uintptr) = kernel32.LocalAlloc
 //sys LocalFree(ptr uintptr) = kernel32.LocalFree
 
-// BOOL QueryWorkingSet(
-//	HANDLE hProcess,
-//	PVOID  pv,
-//	DWORD  cb
+// HANDLE GetProcessHeap();
+//
+//sys GetProcessHeap() (procHeap windows.Handle, err error) = kernel32.GetProcessHeap
+
+// DECLSPEC_ALLOCATOR LPVOID HeapAlloc(
+// 	HANDLE hHeap,
+// 	DWORD  dwFlags,
+// 	SIZE_T dwBytes
 // );
-//sys QueryWorkingSet(handle windows.Handle, pv uintptr, cb uint32) (err error) = psapi.QueryWorkingSet
+//
+//sys HeapAlloc(hHeap windows.Handle, dwFlags uint32, dwBytes uintptr) (lpMem uintptr, err error) = kernel32.HeapAlloc
 
-type PSAPI_WORKING_SET_INFORMATION struct {
-	NumberOfEntries uintptr
-	WorkingSetInfo  [1]PSAPI_WORKING_SET_BLOCK
-}
-
-type PSAPI_WORKING_SET_BLOCK struct {
-	Flags uintptr
-}
+// BOOL HeapFree(
+// 	HANDLE                 hHeap,
+// 	DWORD                  dwFlags,
+// 	_Frees_ptr_opt_ LPVOID lpMem
+// );
+//
+//sys HeapFree(hHeap windows.Handle, dwFlags uint32, lpMem uintptr) (err error) = kernel32.HeapFree
