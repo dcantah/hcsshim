@@ -1,6 +1,8 @@
 package winapi
 
 import (
+	"unsafe"
+
 	"golang.org/x/sys/windows"
 )
 
@@ -24,6 +26,8 @@ const (
 // https://docs.microsoft.com/en-us/windows/win32/api/jobapi2/ns-jobapi2-jobobject_io_rate_control_information
 const JOB_OBJECT_IO_RATE_CONTROL_ENABLE = 0x1
 
+const JOBOBJECT_IO_ATTRIBUTION_CONTROL_ENABLE uint32 = 0x1
+
 // https://docs.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-jobobject_cpu_rate_control_information
 const (
 	JOB_OBJECT_CPU_RATE_CONTROL_ENABLE = 1 << iota
@@ -41,7 +45,9 @@ const (
 	JobObjectBasicProcessIdList              uint32 = 3
 	JobObjectBasicAndIoAccountingInformation uint32 = 8
 	JobObjectLimitViolationInformation       uint32 = 13
+	JobObjectMemoryUsageInformation          uint32 = 28
 	JobObjectNotificationLimitInformation2   uint32 = 33
+	JobObjectIoAttribution                   uint32 = 42
 )
 
 // https://docs.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-jobobject_basic_limit_information
@@ -80,9 +86,68 @@ type JOBOBJECT_BASIC_PROCESS_ID_LIST struct {
 	ProcessIdList             [1]uintptr
 }
 
+// AllPids returns all the process Ids in the job object.
+func (p *JOBOBJECT_BASIC_PROCESS_ID_LIST) AllPids() []uintptr {
+	return (*[(1 << 27) - 1]uintptr)(unsafe.Pointer(&p.ProcessIdList[0]))[:p.NumberOfProcessIdsInList:p.NumberOfProcessIdsInList]
+}
+
+// https://docs.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-jobobject_basic_accounting_information
+type JOBOBJECT_BASIC_ACCOUNTING_INFORMATION struct {
+	TotalUserTime             int64
+	TotalKernelTime           int64
+	ThisPeriodTotalUserTime   int64
+	ThisPeriodTotalKernelTime int64
+	TotalPageFaultCount       uint32
+	TotalProcesses            uint32
+	ActiveProcesses           uint32
+	TotalTerminateProcesses   uint32
+}
+
+//https://docs.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-jobobject_basic_and_io_accounting_information
+type JOBOBJECT_BASIC_AND_IO_ACCOUNTING_INFORMATION struct {
+	BasicInfo JOBOBJECT_BASIC_ACCOUNTING_INFORMATION
+	IoInfo    windows.IO_COUNTERS
+}
+
+// typedef struct _JOBOBJECT_MEMORY_USAGE_INFORMATION {
+//     ULONG64 JobMemory;
+//     ULONG64 PeakJobMemoryUsed;
+// } JOBOBJECT_MEMORY_USAGE_INFORMATION, *PJOBOBJECT_MEMORY_USAGE_INFORMATION;
+//
+type JOBOBJECT_MEMORY_USAGE_INFORMATION struct {
+	JobMemory         uint64
+	PeakJobMemoryUsed uint64
+}
+
+// typedef struct _JOBOBJECT_IO_ATTRIBUTION_STATS {
+//     ULONG_PTR IoCount;
+//     ULONGLONG TotalNonOverlappedQueueTime;
+//     ULONGLONG TotalNonOverlappedServiceTime;
+//     ULONGLONG TotalSize;
+// } JOBOBJECT_IO_ATTRIBUTION_STATS, *PJOBOBJECT_IO_ATTRIBUTION_STATS;
+//
+type JOBOBJECT_IO_ATTRIBUTION_STATS struct {
+	IoCount                       uintptr
+	TotalNonOverlappedQueueTime   uint64
+	TotalNonOverlappedServiceTime uint64
+	TotalSize                     uint64
+}
+
+// typedef struct _JOBOBJECT_IO_ATTRIBUTION_INFORMATION {
+//     ULONG ControlFlags;
+//     JOBOBJECT_IO_ATTRIBUTION_STATS ReadStats;
+//     JOBOBJECT_IO_ATTRIBUTION_STATS WriteStats;
+// } JOBOBJECT_IO_ATTRIBUTION_INFORMATION, *PJOBOBJECT_IO_ATTRIBUTION_INFORMATION;
+//
+type JOBOBJECT_IO_ATTRIBUTION_INFORMATION struct {
+	ControlFlags uint32
+	ReadStats    JOBOBJECT_IO_ATTRIBUTION_STATS
+	WriteStats   JOBOBJECT_IO_ATTRIBUTION_STATS
+}
+
 // https://docs.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-jobobject_associate_completion_port
 type JOBOBJECT_ASSOCIATE_COMPLETION_PORT struct {
-	CompletionKey  uintptr
+	CompletionKey  windows.Handle
 	CompletionPort windows.Handle
 }
 
