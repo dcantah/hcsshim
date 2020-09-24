@@ -9,11 +9,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/Microsoft/hcsshim/internal/credentials"
 	"github.com/Microsoft/hcsshim/internal/layers"
 	"github.com/Microsoft/hcsshim/internal/log"
+	"github.com/Microsoft/hcsshim/internal/oci"
 	"github.com/Microsoft/hcsshim/internal/resources"
 	"github.com/Microsoft/hcsshim/internal/schemaversion"
 	"github.com/Microsoft/hcsshim/internal/uvm"
@@ -36,11 +38,25 @@ func allocateWindowsResources(ctx context.Context, coi *createOptionsInternal, r
 		}
 	}
 
+	scratchLayer := filepath.Join(scratchFolder, "sandbox.vhdx")
 	// Create sandbox.vhdx if it doesn't exist in the scratch folder. It's called sandbox.vhdx
 	// rather than scratch.vhdx as in the v1 schema, it's hard-coded in HCS.
-	if _, err := os.Stat(filepath.Join(scratchFolder, "sandbox.vhdx")); os.IsNotExist(err) {
+	if _, err := os.Stat(scratchLayer); os.IsNotExist(err) {
 		if err := wclayer.CreateScratchLayer(ctx, scratchFolder, coi.Spec.Windows.LayerFolders[:len(coi.Spec.Windows.LayerFolders)-1]); err != nil {
 			return fmt.Errorf("failed to CreateSandboxLayer %s", err)
+		}
+	}
+
+	// Expand scratch volume if specified in the spec. At this point the scratch
+	// VHD is guaranteed to be present.
+	if coi.hasCustomScratchSize() {
+		size, err := strconv.ParseUint(coi.Spec.Annotations[oci.AnnotationContainerStorageScratchSize], 10, 64)
+		if err != nil {
+			return fmt.Errorf("failed to convert string to uint64: %s", err)
+		}
+		// The call takes the size in bytes so convert from MB.
+		if err := wclayer.ExpandScratchSize(ctx, scratchLayer, size*1024*1024); err != nil {
+			return fmt.Errorf("failed to ExpandScratchSize: %s", err)
 		}
 	}
 

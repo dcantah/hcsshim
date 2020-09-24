@@ -78,6 +78,14 @@ const (
 	// used via OCI runtimes and rather use
 	// `spec.Windows.Resources.Storage.Iops`.
 	AnnotationContainerStorageQoSIopsMaximum = "io.microsoft.container.storage.qos.iopsmaximum"
+	// AnnotationContainerStorageSandboxVHDSize overrides the container storage
+	// sandbox VHD size set via the OCI spec.
+	//
+	// Note: This is only present because CRI does not (currently) have a
+	// `WindowsPodSandboxConfig` for setting this correctly. It should not be
+	// used via OCI runtimes and rather use
+	// `spec.Windows.Resources.Storage.SandboxSize`.
+	AnnotationContainerStorageScratchSize = "io.microsoft.container.storage.scratch.size"
 	// AnnotationGPUVHDPath overrides the default path to search for the gpu vhd
 	AnnotationGPUVHDPath = "io.microsoft.lcow.gpuvhdpath"
 	// AnnotationAssignedDeviceKernelDrivers indicates what drivers to install in the pod during device
@@ -422,6 +430,10 @@ func SpecToUVMCreateOpts(ctx context.Context, s *specs.Spec, id, owner string) (
 func UpdateSpecFromOptions(s specs.Spec, opts *runhcsopts.Options) specs.Spec {
 	if opts == nil {
 		return s
+	}
+
+	if _, ok := s.Annotations[AnnotationContainerStorageScratchSize]; !ok && opts.ContainerScratchSizeInMb != 0 {
+		s.Annotations[AnnotationContainerStorageScratchSize] = strconv.FormatInt(int64(opts.ContainerScratchSizeInMb), 10)
 	}
 
 	if _, ok := s.Annotations[annotationBootFilesRootPath]; !ok && opts.BootFilesRootPath != "" {

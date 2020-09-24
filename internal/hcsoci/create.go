@@ -258,3 +258,7 @@ func (coi *createOptionsInternal) hasWindowsAssignedDevices() bool {
 	return (coi.Spec.Windows != nil) && (coi.Spec.Windows.Devices != nil) &&
 		(len(coi.Spec.Windows.Devices) > 0)
 }
+
+func (coi *createOptionsInternal) hasCustomScratchSize() bool {
+	return coi.Spec.Annotations[oci.AnnotationContainerStorageScratchSize] != ""
+}

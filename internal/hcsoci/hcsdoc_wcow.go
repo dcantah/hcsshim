@@ -35,7 +35,7 @@ func createWindowsContainerDocument(ctx context.Context, coi *createOptionsInter
 	}
 
 	if coi.Spec.Windows == nil {
-		return nil, nil, fmt.Errorf("cannot create HCS container document - OCI spec Windows section is missing ")
+		return nil, nil, fmt.Errorf("cannot create HCS container document - OCI spec Windows section is missing")
 	}
 
 	v1 := &schema1.ContainerConfig{

@@ -63,6 +63,12 @@ message Options {
 	// GPUVHDPath is the path to the gpu vhd to add to the uvm
 	// when a container requests a gpu
 	string GPUVHDPath = 10; 
+
+	// ContainerScratchSize is the default size in MB that will be used for 
+	// the sandbox volume for containers.
+	//
+	// The platform default if ommitted is 20480MB (20GB). 
+	int32 container_scratch_size_in_mb = 11;
 }
 
 // ProcessDetails contains additional information about a process. This is the additional
