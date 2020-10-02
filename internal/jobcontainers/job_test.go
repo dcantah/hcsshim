@@ -17,9 +17,9 @@ import (
 func createProcesses(count int) []*JobProcess {
 	procs := make([]*JobProcess, count)
 	for i := 0; i < count; i++ {
-		// cmd := exec.Command("ping", "-t", "127.0.0.1")
+		cmd := exec.Command("ping", "-t", "127.0.0.1")
 		// cmd := exec.Command("winver")
-		cmd := exec.Command(`C:\Users\dcanter\go\src\github.com\dcantah\demo\demo.exe`)
+		// cmd := exec.Command(`C:\Users\dcanter\go\src\github.com\dcantah\demo\demo.exe`)
 		cmd.SysProcAttr = &syscall.SysProcAttr{
 			CreationFlags: windows.CREATE_NEW_PROCESS_GROUP,
 		}
@@ -33,6 +33,7 @@ func startAndWait(job *jobs.JobObject, procs []*JobProcess) error {
 		if err := proc.Start(); err != nil {
 			return err
 		}
+		fmt.Println(proc.Pid())
 		if err := job.Assign(uint32(proc.Pid())); err != nil {
 			return err
 		}
@@ -444,7 +445,7 @@ func TestMultipleJobsIOCP(t *testing.T) {
 	go func() {
 		// Wait two seconds and then kill all the procs. Should trigger the IOCP
 		// message if all the processes exit successfully
-		time.Sleep(time.Second * 2)
+		time.Sleep(time.Second * 15)
 		if err := job.Shutdown(context.Background()); err != nil {
 			t.Fatalf("failed to shutdown job: %s", err)
 		}
