@@ -131,6 +131,7 @@ const (
 	annotationStorageQoSIopsMaximum       = "io.microsoft.virtualmachine.storageqos.iopsmaximum"
 	annotationFullyPhysicallyBacked       = "io.microsoft.virtualmachine.fullyphysicallybacked"
 	annotationDisableCompartmentNamespace = "io.microsoft.virtualmachine.disablecompartmentnamespace"
+	annotationOnlySignalInitProcess       = "io.microsoft.virtualmachine.lcow.onlysignalinitprocess"
 	// A boolean annotation to control whether to use an external bridge or the
 	// HCS-GCS bridge. Default value is true which means external bridge will be used
 	// by default.
@@ -440,6 +441,10 @@ func UpdateSpecFromOptions(s specs.Spec, opts *runhcsopts.Options) specs.Spec {
 
 	if _, ok := s.Annotations[AnnotationGPUVHDPath]; !ok && opts.GPUVHDPath != "" {
 		s.Annotations[AnnotationGPUVHDPath] = opts.GPUVHDPath
+	}
+
+	if _, ok := s.Annotations[annotationOnlySignalInitProcess]; !ok && opts.OnlySignalInitProcess {
+		s.Annotations[annotationOnlySignalInitProcess] = "true"
 	}
 
 	return s
