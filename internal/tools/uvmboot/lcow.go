@@ -4,10 +4,13 @@ import (
 	"context"
 	"io"
 	"os"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/Microsoft/hcsshim/internal/cmd"
 	"github.com/Microsoft/hcsshim/internal/uvm"
+	uvmpkg "github.com/Microsoft/hcsshim/internal/uvm"
 	"github.com/containerd/console"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
@@ -23,6 +26,8 @@ const (
 	rootFSTypeArgName     = "root-fs-type"
 	vpMemMaxCountArgName  = "vpmem-max-count"
 	vpMemMaxSizeArgName   = "vpmem-max-size"
+	mountArgName          = "mount"
+	dismountTimerArgName  = "dismount-timer"
 )
 
 var (
@@ -79,10 +84,18 @@ var lcowCommand = cli.Command{
 			Usage:       "create the process in the UVM with a TTY enabled",
 			Destination: &lcowUseTerminal,
 		},
+		cli.StringFlag{
+			Name:  mountArgName,
+			Usage: "mounts a scsi disk at path",
+		},
+		cli.UintFlag{
+			Name:  dismountTimerArgName,
+			Usage: "unmounts a scsi disk after a certain time",
+		},
 	},
 	Action: func(c *cli.Context) error {
 		runMany(c, func(id string) error {
-			options := uvm.NewDefaultOptionsLCOW(id, "")
+			options := uvmpkg.NewDefaultOptionsLCOW(id, "")
 			setGlobalOptions(c, options.Options)
 			useGcs := c.GlobalBool(gcsArgName)
 			options.UseGuestConnection = useGcs
@@ -93,11 +106,11 @@ var lcowCommand = cli.Command{
 			if c.IsSet(rootFSTypeArgName) {
 				switch strings.ToLower(c.String(rootFSTypeArgName)) {
 				case "initrd":
-					options.RootFSFile = uvm.InitrdFile
+					options.RootFSFile = uvmpkg.InitrdFile
 					options.PreferredRootFSType = uvm.PreferredRootFSTypeInitRd
 				case "vhd":
-					options.RootFSFile = uvm.VhdFile
-					options.PreferredRootFSType = uvm.PreferredRootFSTypeVHD
+					options.RootFSFile = uvmpkg.VhdFile
+					options.PreferredRootFSType = uvmpkg.PreferredRootFSTypeVHD
 				default:
 					logrus.Fatalf("Unrecognized value '%s' for option %s", c.String(rootFSTypeArgName), rootFSTypeArgName)
 				}
@@ -124,7 +137,7 @@ var lcowCommand = cli.Command{
 				if c.IsSet(outputHandlingArgName) {
 					switch strings.ToLower(c.String(outputHandlingArgName)) {
 					case "stdout":
-						options.OutputHandler = uvm.OutputHandler(func(r io.Reader) { io.Copy(os.Stdout, r) })
+						options.OutputHandler = uvmpkg.OutputHandler(func(r io.Reader) { io.Copy(os.Stdout, r) })
 					default:
 						logrus.Fatalf("Unrecognized value '%s' for option %s", c.String(outputHandlingArgName), outputHandlingArgName)
 					}
@@ -144,8 +157,14 @@ var lcowCommand = cli.Command{
 	},
 }
 
-func runLCOW(ctx context.Context, options *uvm.OptionsLCOW, c *cli.Context) error {
-	uvm, err := uvm.CreateLCOW(ctx, options)
+func release(ctx context.Context, mounts []*uvmpkg.SCSIMount) {
+	for _, mount := range mounts {
+		mount.Release(ctx)
+	}
+}
+
+func runLCOW(ctx context.Context, options *uvmpkg.OptionsLCOW, c *cli.Context) error {
+	uvm, err := uvmpkg.CreateLCOW(ctx, options)
 	if err != nil {
 		return err
 	}
@@ -156,6 +175,26 @@ func runLCOW(ctx context.Context, options *uvm.OptionsLCOW, c *cli.Context) erro
 	}
 
 	if options.UseGuestConnection {
+		if c.IsSet(mountArgName) {
+			scsiMounts := []*uvmpkg.SCSIMount{}
+			paths := strings.Split(c.String(mountArgName), ",")
+			for i, path := range paths {
+				index := strconv.Itoa(i)
+				scsiMount, err := uvm.AddSCSI(ctx, path, "/mount/"+index, false, uvmpkg.VMAccessTypeIndividual)
+				if err != nil {
+					return err
+				}
+				scsiMounts = append(scsiMounts, scsiMount)
+			}
+			if c.IsSet(dismountTimerArgName) {
+				go func() {
+					time.Sleep(time.Second * time.Duration(c.Uint(dismountTimerArgName)))
+					release(ctx, scsiMounts)
+				}()
+			} else {
+				defer release(ctx, scsiMounts)
+			}
+		}
 		if err := execViaGcs(uvm, c); err != nil {
 			return err
 		}
@@ -167,7 +206,7 @@ func runLCOW(ctx context.Context, options *uvm.OptionsLCOW, c *cli.Context) erro
 	return uvm.Wait()
 }
 
-func execViaGcs(vm *uvm.UtilityVM, c *cli.Context) error {
+func execViaGcs(vm *uvmpkg.UtilityVM, c *cli.Context) error {
 	cmd := cmd.Command(vm, "/bin/sh", "-c", c.String(execCommandLineArgName))
 	cmd.Log = logrus.NewEntry(logrus.StandardLogger())
 	if lcowUseTerminal {
