@@ -40,20 +40,22 @@ var (
 	modiphlpapi = windows.NewLazySystemDLL("iphlpapi.dll")
 	modkernel32 = windows.NewLazySystemDLL("kernel32.dll")
 	modadvapi32 = windows.NewLazySystemDLL("advapi32.dll")
+	modpsapi    = windows.NewLazySystemDLL("psapi.dll")
 	modcfgmgr32 = windows.NewLazySystemDLL("cfgmgr32.dll")
 	modntdll    = windows.NewLazySystemDLL("ntdll.dll")
 
 	procSetJobCompartmentId                  = modiphlpapi.NewProc("SetJobCompartmentId")
+	procGetQueuedCompletionStatus            = modkernel32.NewProc("GetQueuedCompletionStatus")
 	procIsProcessInJob                       = modkernel32.NewProc("IsProcessInJob")
 	procQueryInformationJobObject            = modkernel32.NewProc("QueryInformationJobObject")
 	procOpenJobObjectW                       = modkernel32.NewProc("OpenJobObjectW")
 	procSetIoRateControlInformationJobObject = modkernel32.NewProc("SetIoRateControlInformationJobObject")
-	procGetQueuedCompletionStatus            = modkernel32.NewProc("GetQueuedCompletionStatus")
-	procSearchPathW                          = modkernel32.NewProc("SearchPathW")
 	procLogonUserW                           = modadvapi32.NewProc("LogonUserW")
 	procRtlMoveMemory                        = modkernel32.NewProc("RtlMoveMemory")
 	procLocalAlloc                           = modkernel32.NewProc("LocalAlloc")
 	procLocalFree                            = modkernel32.NewProc("LocalFree")
+	procQueryWorkingSet                      = modpsapi.NewProc("QueryWorkingSet")
+	procGetProcessImageFileNameW             = modkernel32.NewProc("GetProcessImageFileNameW")
 	procGetActiveProcessorCount              = modkernel32.NewProc("GetActiveProcessorCount")
 	procCM_Get_Device_ID_List_SizeA          = modcfgmgr32.NewProc("CM_Get_Device_ID_List_SizeA")
 	procCM_Get_Device_ID_ListA               = modcfgmgr32.NewProc("CM_Get_Device_ID_ListA")
@@ -70,6 +72,18 @@ func SetJobCompartmentId(handle windows.Handle, compartmentId uint32) (win32Err 
 	r0, _, _ := syscall.Syscall(procSetJobCompartmentId.Addr(), 2, uintptr(handle), uintptr(compartmentId), 0)
 	if r0 != 0 {
 		win32Err = syscall.Errno(r0)
+	}
+	return
+}
+
+func GetQueuedCompletionStatus(cphandle windows.Handle, qty *uint32, key *uintptr, overlapped **windows.Overlapped, timeout uint32) (err error) {
+	r1, _, e1 := syscall.Syscall6(procGetQueuedCompletionStatus.Addr(), 5, uintptr(cphandle), uintptr(unsafe.Pointer(qty)), uintptr(unsafe.Pointer(key)), uintptr(unsafe.Pointer(overlapped)), uintptr(timeout), 0)
+	if r1 == 0 {
+		if e1 != 0 {
+			err = errnoErr(e1)
+		} else {
+			err = syscall.EINVAL
+		}
 	}
 	return
 }
@@ -130,31 +144,6 @@ func SetIoRateControlInformationJobObject(jobHandle windows.Handle, ioRateContro
 	return
 }
 
-func GetQueuedCompletionStatus(cphandle windows.Handle, qty *uint32, key *uintptr, overlapped **windows.Overlapped, timeout uint32) (err error) {
-	r1, _, e1 := syscall.Syscall6(procGetQueuedCompletionStatus.Addr(), 5, uintptr(cphandle), uintptr(unsafe.Pointer(qty)), uintptr(unsafe.Pointer(key)), uintptr(unsafe.Pointer(overlapped)), uintptr(timeout), 0)
-	if r1 == 0 {
-		if e1 != 0 {
-			err = errnoErr(e1)
-		} else {
-			err = syscall.EINVAL
-		}
-	}
-	return
-}
-
-func SearchPath(lpPath *uint16, lpFileName *uint16, lpExtension *uint16, nBufferLength uint32, lpBuffer *uint16, lpFilePath **uint16) (size uint32, err error) {
-	r0, _, e1 := syscall.Syscall6(procSearchPathW.Addr(), 6, uintptr(unsafe.Pointer(lpPath)), uintptr(unsafe.Pointer(lpFileName)), uintptr(unsafe.Pointer(lpExtension)), uintptr(nBufferLength), uintptr(unsafe.Pointer(lpBuffer)), uintptr(unsafe.Pointer(lpFilePath)))
-	size = uint32(r0)
-	if size == 0 {
-		if e1 != 0 {
-			err = errnoErr(e1)
-		} else {
-			err = syscall.EINVAL
-		}
-	}
-	return
-}
-
 func LogonUser(username *uint16, domain *uint16, password *uint16, logonType uint32, logonProvider uint32, token *windows.Token) (err error) {
 	r1, _, e1 := syscall.Syscall6(procLogonUserW.Addr(), 6, uintptr(unsafe.Pointer(username)), uintptr(unsafe.Pointer(domain)), uintptr(unsafe.Pointer(password)), uintptr(logonType), uintptr(logonProvider), uintptr(unsafe.Pointer(token)))
 	if r1 == 0 {
@@ -187,6 +176,31 @@ func LocalAlloc(flags uint32, size int) (ptr uintptr) {
 
 func LocalFree(ptr uintptr) {
 	syscall.Syscall(procLocalFree.Addr(), 1, uintptr(ptr), 0, 0)
+	return
+}
+
+func QueryWorkingSet(handle windows.Handle, pv uintptr, cb uint32) (err error) {
+	r1, _, e1 := syscall.Syscall(procQueryWorkingSet.Addr(), 3, uintptr(handle), uintptr(pv), uintptr(cb))
+	if r1 == 0 {
+		if e1 != 0 {
+			err = errnoErr(e1)
+		} else {
+			err = syscall.EINVAL
+		}
+	}
+	return
+}
+
+func GetProcessImageFileName(hProcess windows.Handle, imageFileName *uint16, nSize uint32) (size uint32, err error) {
+	r0, _, e1 := syscall.Syscall(procGetProcessImageFileNameW.Addr(), 3, uintptr(hProcess), uintptr(unsafe.Pointer(imageFileName)), uintptr(nSize))
+	size = uint32(r0)
+	if size == 0 {
+		if e1 != 0 {
+			err = errnoErr(e1)
+		} else {
+			err = syscall.EINVAL
+		}
+	}
 	return
 }
 

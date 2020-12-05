@@ -227,6 +227,21 @@ func (job *JobObject) SetIOLimit(maxBandwidth, maxIOPS int64) error {
 	return nil
 }
 
+// SetTerminateOnLastHandleClose sets the job object flag that specifies that the job should terminate
+// all processes in the job on the last open handle being closed.
+func (job *JobObject) SetTerminateOnLastHandleClose() error {
+	bli := windows.JOBOBJECT_BASIC_LIMIT_INFORMATION{LimitFlags: windows.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE}
+	if _, err := windows.SetInformationJobObject(
+		job.handle,
+		windows.JobObjectBasicLimitInformation,
+		uintptr(unsafe.Pointer(&bli)),
+		uint32(unsafe.Sizeof(bli)),
+	); err != nil {
+		return err
+	}
+	return nil
+}
+
 // PollNotification will poll for a job object notification. This call should only be called once
 // per job (ideally in a goroutine loop) and will block if there is not a notification ready.
 // This call will return immediately with error `ErrNotRegistered` if the job was not registered
