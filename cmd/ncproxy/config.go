@@ -2,10 +2,11 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+
+	"github.com/pkg/errors"
 )
 
 type config struct {
@@ -27,7 +28,7 @@ func loadConfig(path string) (*config, error) {
 	if path, exists := configPresent(); exists {
 		return readConfig(path)
 	}
-	return nil, fmt.Errorf("no config specified and no default config found")
+	return nil, errors.New("no config specified and no default config found")
 }
 
 // Reads config from path and returns config struct if path is valid and marshaling
@@ -35,11 +36,11 @@ func loadConfig(path string) (*config, error) {
 func readConfig(path string) (*config, error) {
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read config file: %s", err)
+		return nil, errors.Wrap(err, "failed to read config file")
 	}
 	conf := &config{}
 	if err := json.Unmarshal(data, conf); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal config data")
+		return nil, errors.Wrap(err, "failed to unmarshal config data")
 	}
 	return conf, nil
 }
