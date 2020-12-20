@@ -57,6 +57,7 @@ func newJobContainer(id string, s *specs.Spec) *JobContainer {
 		id:        id,
 		spec:      s,
 		waitBlock: make(chan struct{}),
+		exited:    make(chan struct{}),
 		init:      initProc{initBlock: make(chan struct{})},
 	}
 }
@@ -302,16 +303,20 @@ func (c *JobContainer) shutdown(ctx context.Context) error {
 		return nil
 	}
 
-	for _, pid := range pids {
-		if err := windows.GenerateConsoleCtrlEvent(windows.CTRL_BREAK_EVENT, pid); err != nil {
-			return err
-		}
+	//for _, pid := range pids {
+	// if err := windows.GenerateConsoleCtrlEvent(windows.CTRL_BREAK_EVENT, pid); err != nil {
+	// 	return err
+	// }
+	//}
+
+	if err := c.Terminate(ctx); err != nil {
+		return errors.Wrap(err, "failed to shutdown job container")
 	}
 
 	select {
 	case <-c.exited:
 	case <-ctx.Done():
-		return ctx.Err()
+		return c.Terminate(ctx)
 	}
 	return nil
 }
@@ -353,7 +358,7 @@ func (c *JobContainer) waitBackground(ctx context.Context) {
 	// them to exit.
 	<-c.init.proc.waitBlock
 
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	if err := c.Shutdown(ctx); err != nil {
 		c.Terminate(ctx)

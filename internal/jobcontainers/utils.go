@@ -6,10 +6,11 @@ import (
 	"github.com/Microsoft/hcsshim/internal/jobobject"
 )
 
-// Seperates path to executable/cmd from it's arguments
+// Seperates path to executable/cmd from it's arguments. The path itself needs to be the
+// first element in the arguments.
 func separateArgs(cmdline string) (string, []string) {
 	split := strings.Fields(cmdline)
-	return split[0], split[1:]
+	return split[0], split
 }
 
 func calculateJobCPUWeight(processorWeight uint32) uint32 {

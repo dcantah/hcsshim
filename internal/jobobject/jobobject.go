@@ -230,12 +230,16 @@ func (job *JobObject) SetIOLimit(maxBandwidth, maxIOPS int64) error {
 // SetTerminateOnLastHandleClose sets the job object flag that specifies that the job should terminate
 // all processes in the job on the last open handle being closed.
 func (job *JobObject) SetTerminateOnLastHandleClose() error {
-	bli := windows.JOBOBJECT_BASIC_LIMIT_INFORMATION{LimitFlags: windows.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE}
+	eli := windows.JOBOBJECT_EXTENDED_LIMIT_INFORMATION{
+		BasicLimitInformation: windows.JOBOBJECT_BASIC_LIMIT_INFORMATION{
+			LimitFlags: windows.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+		},
+	}
 	if _, err := windows.SetInformationJobObject(
 		job.handle,
-		windows.JobObjectBasicLimitInformation,
-		uintptr(unsafe.Pointer(&bli)),
-		uint32(unsafe.Sizeof(bli)),
+		windows.JobObjectExtendedLimitInformation,
+		uintptr(unsafe.Pointer(&eli)),
+		uint32(unsafe.Sizeof(eli)),
 	); err != nil {
 		return err
 	}
