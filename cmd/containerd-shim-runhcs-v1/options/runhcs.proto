@@ -83,6 +83,10 @@ message Options {
 	// This currently only affects LCOW. The sandbox containers scratch space is re-used for all
 	// subsequent containers launched in the pod.  
 	bool share_scratch = 14;
+
+	// job_container specifies whether to have the runtime create job containers 
+	// instead of the standard hcs containers. 
+	bool job_container = 15;
 }
 
 // ProcessDetails contains additional information about a process. This is the additional

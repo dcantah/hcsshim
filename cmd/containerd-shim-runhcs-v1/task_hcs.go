@@ -25,6 +25,7 @@ import (
 	"github.com/Microsoft/hcsshim/internal/cow"
 	"github.com/Microsoft/hcsshim/internal/hcs"
 	"github.com/Microsoft/hcsshim/internal/hcsoci"
+	"github.com/Microsoft/hcsshim/internal/jobcontainers"
 	"github.com/Microsoft/hcsshim/internal/log"
 	"github.com/Microsoft/hcsshim/internal/oci"
 	"github.com/Microsoft/hcsshim/internal/resources"
@@ -35,7 +36,7 @@ import (
 	"github.com/Microsoft/hcsshim/osversion"
 )
 
-func newHcsStandaloneTask(ctx context.Context, events publisher, req *task.CreateTaskRequest, s *specs.Spec) (shimTask, error) {
+func newHcsStandaloneTask(ctx context.Context, events publisher, req *task.CreateTaskRequest, jobContainer bool, s *specs.Spec) (shimTask, error) {
 	log.G(ctx).WithField("tid", req.ID).Debug("newHcsStandaloneTask")
 
 	ct, _, err := oci.GetSandboxTypeAndID(s.Annotations)
@@ -97,7 +98,7 @@ func newHcsStandaloneTask(ctx context.Context, events publisher, req *task.Creat
 		return nil, errors.Wrap(errdefs.ErrFailedPrecondition, "oci spec does not contain WCOW or LCOW spec")
 	}
 
-	shim, err := newHcsTask(ctx, events, parent, true, req, s)
+	shim, err := newHcsTask(ctx, events, parent, true, req, jobContainer, s)
 	if err != nil {
 		if parent != nil {
 			parent.Close()
@@ -117,6 +118,7 @@ func newHcsTask(
 	parent *uvm.UtilityVM,
 	ownsParent bool,
 	req *task.CreateTaskRequest,
+	isJobContainer bool,
 	s *specs.Spec) (_ shimTask, err error) {
 	log.G(ctx).WithFields(logrus.Fields{
 		"tid":        req.ID,
@@ -131,7 +133,11 @@ func newHcsTask(
 		return nil, err
 	}
 
-	var netNS string
+	var (
+		netNS     string
+		resources *resources.Resources
+		container cow.Container
+	)
 	if s.Windows != nil &&
 		s.Windows.Network != nil {
 		netNS = s.Windows.Network.NetworkNamespace
@@ -158,29 +164,35 @@ func newHcsTask(
 		opts.ScaleCPULimitsToSandbox = shimOpts.ScaleCpuLimitsToSandbox
 	}
 
-	system, resources, err := hcsoci.CreateContainer(ctx, &opts)
-	if err != nil {
-		return nil, err
+	if isJobContainer {
+		container, err = jobcontainers.Create(ctx, req.ID, s)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		container, resources, err = hcsoci.CreateContainer(ctx, &opts)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	ht := &hcsTask{
-		events:     events,
-		id:         req.ID,
-		isWCOW:     oci.IsWCOW(s),
-		c:          system,
-		cr:         resources,
-		ownsHost:   ownsParent,
-		host:       parent,
-		closed:     make(chan struct{}),
-		taskSpec:   s,
-		isTemplate: isTemplate,
+		events:       events,
+		id:           req.ID,
+		isWCOW:       oci.IsWCOW(s),
+		c:            container,
+		cr:           resources,
+		ownsHost:     ownsParent,
+		jobContainer: isJobContainer,
+		host:         parent,
+		closed:       make(chan struct{}),
 	}
 	ht.init = newHcsExec(
 		ctx,
 		events,
 		req.ID,
 		parent,
-		system,
+		container,
 		req.ID,
 		req.Bundle,
 		ht.isWCOW,
@@ -374,6 +386,11 @@ type hcsTask struct {
 	// NOTE: if `osversion.Get().Build < osversion.RS5` this will always be
 	// `nil`.
 	host *uvm.UtilityVM
+
+	// Determines whether this task is a job container
+	//
+	// It MUST be treated as read only in the lifetime of the task.
+	jobContainer bool
 
 	// ecl is the exec create lock for all non-init execs and MUST be held
 	// durring create to prevent ID duplication.
@@ -708,9 +725,16 @@ func (ht *hcsTask) close(ctx context.Context) {
 				}
 			}
 
-			// Release any resources associated with the container.
-			if err := resources.ReleaseResources(ctx, ht.cr, ht.host, true); err != nil {
-				log.G(ctx).WithError(err).Error("failed to release container resources")
+			if ht.jobContainer {
+				pc := ht.c.(*jobcontainers.JobContainer)
+				if err := pc.Release(ctx); err != nil {
+					log.G(ctx).WithError(err).Error("failed to release job container resources")
+				}
+			} else {
+				// Release any resources associated with the container.
+				if err := resources.ReleaseResources(ctx, ht.cr, ht.host, true); err != nil {
+					log.G(ctx).WithError(err).Error("failed to release container resources")
+				}
 			}
 
 			// Close the container handle invalidating all future access.
@@ -832,6 +856,10 @@ func hcsPropertiesToWindowsStats(props *hcsschema.Properties) *stats.Statistics_
 
 func (ht *hcsTask) Stats(ctx context.Context) (*stats.Statistics, error) {
 	s := &stats.Statistics{}
+	if ht.jobContainer {
+		return s, nil
+	}
+
 	props, err := ht.c.PropertiesV2(ctx, hcsschema.PTStatistics)
 	if err != nil && !isStatsNotFound(err) {
 		return nil, err

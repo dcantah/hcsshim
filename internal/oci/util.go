@@ -16,3 +16,11 @@ func IsWCOW(s *specs.Spec) bool {
 func IsIsolated(s *specs.Spec) bool {
 	return IsLCOW(s) || (s.Windows != nil && s.Windows.HyperV != nil)
 }
+
+// IsJobContainer checks if `s` is asking for a Windows job container.
+func IsJobContainer(s *specs.Spec) bool {
+	if _, ok := s.Annotations[AnnotationHostProcessContainer]; ok {
+		return true
+	}
+	return false
+}

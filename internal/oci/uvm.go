@@ -518,5 +518,9 @@ func UpdateSpecFromOptions(s specs.Spec, opts *runhcsopts.Options) specs.Spec {
 		s.Annotations[AnnotationGPUVHDPath] = opts.GPUVHDPath
 	}
 
+	if _, ok := s.Annotations[AnnotationHostProcessContainer]; !ok && opts.JobContainer {
+		s.Annotations[AnnotationHostProcessContainer] = "true"
+	}
+
 	return s
 }

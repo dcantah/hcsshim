@@ -401,7 +401,7 @@ func (c *JobContainer) waitBackground(ctx context.Context) {
 	// them to exit.
 	<-c.init.proc.waitBlock
 
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	if err := c.Shutdown(ctx); err != nil {
 		c.Terminate(ctx)
