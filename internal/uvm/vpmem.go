@@ -2,14 +2,15 @@ package uvm
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/Microsoft/hcsshim/internal/guestrequest"
 	"github.com/Microsoft/hcsshim/internal/log"
 	"github.com/Microsoft/hcsshim/internal/requesttype"
 	hcsschema "github.com/Microsoft/hcsshim/internal/schema2"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -65,11 +66,18 @@ func (uvm *UtilityVM) AddVPMEM(ctx context.Context, hostPath string) (_ string, 
 	uvm.m.Lock()
 	defer uvm.m.Unlock()
 
+	// vhd could be a symlink to a network share or similar. Evaluate before we store
+	// or search for a path we might have used before.
+	actualPath, err := filepath.EvalSymlinks(hostPath)
+	if err != nil {
+		return "", errors.Wrapf(err, "error evaluating symlink for path `%s`", hostPath)
+	}
+
 	var deviceNumber uint32
-	deviceNumber, err = uvm.findVPMEMDevice(ctx, hostPath)
+	deviceNumber, err = uvm.findVPMEMDevice(ctx, actualPath)
 	if err != nil {
 		// We are going to add it so make sure it fits on vPMEM
-		fi, err := os.Stat(hostPath)
+		fi, err := os.Stat(actualPath)
 		if err != nil {
 			return "", err
 		}
@@ -78,7 +86,7 @@ func (uvm *UtilityVM) AddVPMEM(ctx context.Context, hostPath string) (_ string, 
 		}
 
 		// It doesn't exist, so we're going to allocate and hot-add it
-		deviceNumber, err = uvm.findNextVPMEM(ctx, hostPath)
+		deviceNumber, err = uvm.findNextVPMEM(ctx, actualPath)
 		if err != nil {
 			return "", err
 		}
@@ -104,11 +112,11 @@ func (uvm *UtilityVM) AddVPMEM(ctx context.Context, hostPath string) (_ string, 
 		}
 
 		if err := uvm.modify(ctx, modification); err != nil {
-			return "", fmt.Errorf("uvm::AddVPMEM: failed to modify utility VM configuration: %s", err)
+			return "", errors.Wrap(err, "uvm::AddVPMEM: failed to modify utility VM configuration")
 		}
 
 		uvm.vpmemDevices[deviceNumber] = &vpmemInfo{
-			hostPath: hostPath,
+			hostPath: actualPath,
 			uvmPath:  uvmPath,
 			refCount: 1,
 		}
@@ -129,7 +137,14 @@ func (uvm *UtilityVM) RemoveVPMEM(ctx context.Context, hostPath string) (err err
 	uvm.m.Lock()
 	defer uvm.m.Unlock()
 
-	deviceNumber, err := uvm.findVPMEMDevice(ctx, hostPath)
+	// vhd could be a symlink to a network share or similar. Evaluate before we store
+	// or search for a path we might have used before.
+	actualPath, err := filepath.EvalSymlinks(hostPath)
+	if err != nil {
+		return errors.Wrapf(err, "error evaluating symlink for path `%s`", hostPath)
+	}
+
+	deviceNumber, err := uvm.findVPMEMDevice(ctx, actualPath)
 	if err != nil {
 		return err
 	}
@@ -150,7 +165,7 @@ func (uvm *UtilityVM) RemoveVPMEM(ctx context.Context, hostPath string) (err err
 		}
 
 		if err := uvm.modify(ctx, modification); err != nil {
-			return fmt.Errorf("failed to remove VPMEM %s from utility VM %s: %s", hostPath, uvm.id, err)
+			return errors.Wrapf(err, "failed to remove VPMEM %s from utility VM %s: %s", actualPath, uvm.id)
 		}
 		log.G(ctx).WithFields(logrus.Fields{
 			"hostPath":     device.hostPath,
