@@ -30,16 +30,16 @@ clean:
 
 test:
 	cd $(SRCROOT) && go test ./service/gcsutils/...
-	cd $(SRCROOT)/service/gcs && ginkgo -r -keepGoing
+	cd $(SRCROOT)/cmd/gcs && ginkgo -r -keepGoing
 
-out/delta.tar.gz: bin/init bin/vsockexec bin/service/gcs bin/service/gcsutils/gcstools Makefile
+out/delta.tar.gz: bin/init bin/vsockexec bin/cmd/gcs bin/cmd/gcstools Makefile
 	@mkdir -p out
 	rm -rf rootfs
 	mkdir -p rootfs/bin/
 	cp bin/init rootfs/
 	cp bin/vsockexec rootfs/bin/
-	cp bin/service/gcs rootfs/bin/
-	cp bin/service/gcsutils/gcstools rootfs/bin/
+	cp bin/cmd/gcs rootfs/bin/
+	cp bin/cmd/gcstools rootfs/bin/
 	for tool in $(GCS_TOOLS); do ln -s gcstools rootfs/bin/$$tool; done
 	git -C $(SRCROOT) rev-parse HEAD > rootfs/gcs.commit && \
 	git -C $(SRCROOT) rev-parse --abbrev-ref HEAD > rootfs/gcs.branch
@@ -58,8 +58,8 @@ out/initrd.img: $(BASE) out/delta.tar.gz $(SRCROOT)/hack/catcpio.sh
 	gzip -c out/initrd.img.uncompressed > $@
 	rm out/initrd.img.uncompressed
 
--include deps/service/gcs.gomake
--include deps/service/gcsutils/gcstools.gomake
+-include deps/cmd/gcs.gomake
+-include deps/cmd/gcstools.gomake
 
 # Implicit rule for includes that define Go targets.
 %.gomake: $(SRCROOT)/Makefile
