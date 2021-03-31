@@ -9,7 +9,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/Microsoft/opengcs/internal/storage/pci"
+	"github.com/Microsoft/hcsshim/internal/storage/pci"
 	oci "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 )

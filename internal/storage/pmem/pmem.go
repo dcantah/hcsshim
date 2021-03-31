@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/Microsoft/opengcs/internal/oc"
-	"github.com/Microsoft/opengcs/internal/storage"
-	dm "github.com/Microsoft/opengcs/internal/storage/devicemapper"
+	"github.com/Microsoft/hcsshim/internal/oc"
+	"github.com/Microsoft/hcsshim/internal/storage"
+	dm "github.com/Microsoft/hcsshim/internal/storage/devicemapper"
 	"github.com/pkg/errors"
 	"go.opencensus.io/trace"
 	"golang.org/x/sys/unix"

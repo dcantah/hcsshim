@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/Microsoft/opengcs/internal/log"
-	"github.com/Microsoft/opengcs/internal/oc"
+	"github.com/Microsoft/hcsshim/internal/log"
+	"github.com/Microsoft/hcsshim/internal/oc"
 	"github.com/pkg/errors"
 	"go.opencensus.io/trace"
 	"golang.org/x/sys/unix"
@@ -111,7 +111,7 @@ func ControllerLunToName(ctx context.Context, controller, lun uint8) (_ string, 
 				time.Sleep(time.Millisecond * 10)
 				continue
 			}
-		} 
+		}
 		break
 	}
 
