@@ -8,6 +8,7 @@ github.com/Microsoft/go-winio/pkg/process
 github.com/Microsoft/go-winio/pkg/security
 github.com/Microsoft/go-winio/vhd
 # github.com/containerd/cgroups v0.0.0-20210114181951-8a68de567b68
+github.com/containerd/cgroups
 github.com/containerd/cgroups/stats/v1
 # github.com/containerd/console v1.0.1
 github.com/containerd/console
@@ -38,8 +39,14 @@ github.com/containerd/go-runc
 github.com/containerd/ttrpc
 # github.com/containerd/typeurl v1.0.1
 github.com/containerd/typeurl
+# github.com/coreos/go-systemd/v22 v22.1.0
+github.com/coreos/go-systemd/v22/dbus
 # github.com/cpuguy83/go-md2man/v2 v2.0.0
 github.com/cpuguy83/go-md2man/v2/md2man
+# github.com/docker/go-units v0.4.0
+github.com/docker/go-units
+# github.com/godbus/dbus/v5 v5.0.3
+github.com/godbus/dbus/v5
 # github.com/gogo/protobuf v1.3.2
 github.com/gogo/protobuf/gogoproto
 github.com/gogo/protobuf/proto
@@ -54,10 +61,17 @@ github.com/golang/protobuf/ptypes
 github.com/golang/protobuf/ptypes/any
 github.com/golang/protobuf/ptypes/duration
 github.com/golang/protobuf/ptypes/timestamp
+# github.com/linuxkit/virtsock v0.0.0-20201010232012-f8cee7dfc7a3
+github.com/linuxkit/virtsock/pkg/vsock
+# github.com/mattn/go-shellwords v1.0.3
+github.com/mattn/go-shellwords
 # github.com/moby/sys/mountinfo v0.4.1
 github.com/moby/sys/mountinfo
 # github.com/opencontainers/go-digest v1.0.0
 github.com/opencontainers/go-digest
+# github.com/opencontainers/runc v1.0.0-rc93
+github.com/opencontainers/runc/libcontainer/devices
+github.com/opencontainers/runc/libcontainer/user
 # github.com/opencontainers/runtime-spec v1.0.3-0.20200929063507-e6143ca7d51d
 github.com/opencontainers/runtime-spec/specs-go
 # github.com/pkg/errors v0.9.1
@@ -70,6 +84,11 @@ github.com/shurcooL/sanitized_anchor_name
 github.com/sirupsen/logrus
 # github.com/urfave/cli v1.22.2
 github.com/urfave/cli
+# github.com/vishvananda/netlink v1.1.0
+github.com/vishvananda/netlink
+github.com/vishvananda/netlink/nl
+# github.com/vishvananda/netns v0.0.0-20191106174202-0a2b9b5464df
+github.com/vishvananda/netns
 # go.opencensus.io v0.22.3
 go.opencensus.io
 go.opencensus.io/internal
