@@ -79,10 +79,11 @@ func (s *source) NewWindowsUVM(ctx context.Context, id, owner string) (vm.UVM, e
 }
 
 type remoteVM struct {
-	id     string
-	state  vm.State
-	config *vmservice.VMConfig
-	client vmservice.VMService
+	id        string
+	state     vm.State
+	waitError error
+	config    *vmservice.VMConfig
+	client    vmservice.VMService
 }
 
 func (uvm *remoteVM) ID() string {
@@ -120,8 +121,14 @@ func (uvm *remoteVM) Stop(ctx context.Context) error {
 }
 
 func (uvm *remoteVM) Wait() error {
-	if _, err := uvm.client.WaitVM(context.Background(), &ptypes.Empty{}); err != nil {
+	_, err := uvm.client.WaitVM(context.Background(), &ptypes.Empty{})
+	if err != nil {
+		uvm.waitError = err
 		return errors.Wrap(err, "failed to wait on remote VM")
 	}
 	return nil
+}
+
+func (uvm *remoteVM) ExitError() error {
+	return uvm.waitError
 }

@@ -244,7 +244,6 @@ func (uvm *UtilityVM) Start(ctx context.Context) (err error) {
 		if err != nil {
 			return err
 		}
-		fmt.Println("gcs conn established")
 		uvm.guestCaps = *uvm.gc.Capabilities()
 		uvm.protocol = uvm.gc.Protocol()
 
@@ -252,7 +251,6 @@ func (uvm *UtilityVM) Start(ctx context.Context) (err error) {
 		if err = uvm.configureHvSocketForGCS(ctx); err != nil {
 			return fmt.Errorf("failed to do initial GCS setup: %s", err)
 		}
-		fmt.Println("configureHvSocketForGCS skipped")
 	} else {
 		// // Cache the guest connection properties.
 		// properties, err := uvm.hcsSystem.Properties(ctx, schema1.PropertyTypeGuestConnection)

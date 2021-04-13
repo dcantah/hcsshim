@@ -341,7 +341,7 @@ func (uvm *UtilityVM) Terminate(ctx context.Context) error {
 
 // ExitError returns an error if the utility VM has terminated unexpectedly.
 func (uvm *UtilityVM) ExitError() error {
-	return uvm.hcsSystem.ExitError()
+	return uvm.u.ExitError()
 }
 
 func defaultProcessorCount() int32 {

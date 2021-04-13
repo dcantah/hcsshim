@@ -121,3 +121,7 @@ func (uvm *utilityVM) Stop(ctx context.Context) error {
 func (uvm *utilityVM) Wait() error {
 	return uvm.cs.Wait()
 }
+
+func (uvm *utilityVM) ExitError() error {
+	return uvm.cs.ExitError()
+}
