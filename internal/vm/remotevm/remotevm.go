@@ -16,21 +16,19 @@ import (
 
 type source struct {
 	// Path to the binary to launch
-	binary         string
-	addr           string
-	createInstance bool
+	binary string
+	addr   string
 }
 
-func NewSource(binary, addr string, createInstance bool) (vm.UVMSource, error) {
+func NewSource(binary, addr string) (vm.UVMSource, error) {
 	return &source{
-		binary:         binary,
-		addr:           addr,
-		createInstance: createInstance,
+		binary: binary,
+		addr:   addr,
 	}, nil
 }
 
 func (s *source) NewLinuxUVM(ctx context.Context, id, owner string) (vm.UVM, error) {
-	if s.createInstance {
+	if s.binary != "" {
 		log.G(ctx).WithFields(logrus.Fields{
 			"binary":  s.binary,
 			"address": s.addr,
@@ -82,8 +80,8 @@ func (uvm *remoteVM) State() vm.State {
 }
 
 func (uvm *remoteVM) Create(ctx context.Context) error {
-	if _, err := uvm.client.CreateVM(ctx, &vmservice.CreateVMRequest{Config: uvm.config}); err != nil {
-		return errors.Wrap(err, "failed to create VM")
+	if _, err := uvm.client.CreateVM(ctx, &vmservice.CreateVMRequest{Config: uvm.config, LogID: uvm.ID()}); err != nil {
+		return errors.Wrap(err, "failed to create remote VM")
 	}
 	uvm.state = vm.StateCreated
 	return nil
@@ -93,7 +91,7 @@ func (uvm *remoteVM) Start(ctx context.Context) error {
 	// The VM is expected to be in a pause state after Create, so start is truthfully just resuming the
 	// VM. This is really what HCS does behind the scenes anyways, it's just labeled as Start.
 	if _, err := uvm.client.ResumeVM(ctx, &ptypes.Empty{}); err != nil {
-		return errors.Wrap(err, "failed to start VM")
+		return errors.Wrap(err, "failed to start remote VM")
 	}
 	uvm.state = vm.StateRunning
 	return nil
@@ -101,7 +99,7 @@ func (uvm *remoteVM) Start(ctx context.Context) error {
 
 func (uvm *remoteVM) Stop(ctx context.Context) error {
 	if _, err := uvm.client.TeardownVM(ctx, &ptypes.Empty{}); err != nil {
-		return errors.Wrap(err, "failed to stop VM")
+		return errors.Wrap(err, "failed to stop remote VM")
 	}
 	uvm.state = vm.StateTerminated
 	return nil
@@ -109,7 +107,7 @@ func (uvm *remoteVM) Stop(ctx context.Context) error {
 
 func (uvm *remoteVM) Wait() error {
 	if _, err := uvm.client.WaitVM(context.Background(), &ptypes.Empty{}); err != nil {
-		return errors.Wrap(err, "failed to wait VM")
+		return errors.Wrap(err, "failed to wait on remote VM")
 	}
 	return nil
 }

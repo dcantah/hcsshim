@@ -194,14 +194,14 @@ func (uvm *UtilityVM) Start(ctx context.Context) (err error) {
 		})
 	}
 
-	err = uvm.hcsSystem.Start(ctx)
+	err = uvm.u.Start(ctx)
 	if err != nil {
 		return err
 	}
 	defer func() {
 		if err != nil {
-			_ = uvm.hcsSystem.Terminate(ctx)
-			_ = uvm.hcsSystem.Wait()
+			_ = uvm.u.Stop(ctx)
+			_ = uvm.u.Wait()
 		}
 	}()
 
@@ -238,9 +238,11 @@ func (uvm *UtilityVM) Start(ctx context.Context) (err error) {
 		}
 		// Start the GCS protocol.
 		gcc := &gcs.GuestConnectionConfig{
-			Conn:     conn,
-			Log:      log.G(ctx).WithField(logfields.UVMID, uvm.id),
-			IoListen: gcs.HvsockIoListen(uvm.runtimeID),
+			Conn: conn,
+			Log:  log.G(ctx).WithField(logfields.UVMID, uvm.id),
+			IoListen: func(port uint32) (net.Listener, error) {
+				return uvm.listenVsock(ctx, port)
+			},
 		}
 		uvm.gc, err = gcc.Connect(ctx, !uvm.IsClone)
 		if err != nil {

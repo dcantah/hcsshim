@@ -2,11 +2,11 @@ package uvm
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 
 	"github.com/Microsoft/hcsshim/internal/ncproxyttrpc"
+	"github.com/pkg/errors"
 
 	"github.com/Microsoft/go-winio/pkg/guid"
 	"github.com/Microsoft/hcsshim/hcn"
@@ -586,11 +586,10 @@ func (uvm *UtilityVM) addNIC(ctx context.Context, id string, endpoint *hns.HNSEn
 		}
 	}
 
-	if err := uvm.modify(ctx, &request); err != nil {
-		return err
+	if err := uvm.u.AddNIC(ctx, id, endpoint.Id, endpoint.MacAddress); err != nil {
+		return errors.Wrap(err, "failed to add NIC to VM")
 	}
-
-	return nil
+	return uvm.guestRequest(ctx, request.GuestRequest)
 }
 
 func (uvm *UtilityVM) removeNIC(ctx context.Context, id string, endpoint *hns.HNSEndpoint) error {

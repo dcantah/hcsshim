@@ -16,6 +16,7 @@ import (
 	"github.com/Microsoft/hcsshim/internal/log"
 	"github.com/Microsoft/hcsshim/internal/requesttype"
 	hcsschema "github.com/Microsoft/hcsshim/internal/schema2"
+	"github.com/Microsoft/hcsshim/internal/vm"
 	"github.com/Microsoft/hcsshim/internal/wclayer"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -309,9 +310,31 @@ func (uvm *UtilityVM) addSCSIActual(ctx context.Context, hostPath, uvmPath, atta
 		SCSIModification.GuestRequest = guestReq
 	}
 
-	if err := uvm.modify(ctx, SCSIModification); err != nil {
-		return nil, fmt.Errorf("failed to modify UVM with new SCSI mount: %s", err)
+	var diskType vm.SCSIDiskType
+	switch attachmentType {
+	case "VirtualDisk":
+		switch ext := filepath.Ext(sm.HostPath); ext {
+		case ".vhd":
+			diskType = vm.SCSIDiskTypeVHD1
+		case ".vhdx":
+			diskType = vm.SCSIDiskTypeVHDX
+		default:
+			return nil, fmt.Errorf("unsupported extension for virtual disk: %s", ext)
+		}
+	case "PassThru":
+		diskType = vm.SCSIDiskTypePassThrough
+	default:
+		return nil, fmt.Errorf("unsupported SCSI disk type: %s", attachmentType)
 	}
+
+	if err := uvm.u.AddSCSIDisk(ctx, uint32(sm.Controller), uint32(sm.LUN), sm.HostPath, diskType, readOnly); err != nil {
+		return nil, errors.Wrap(err, "failed to add SCSI disk")
+	}
+
+	if err := uvm.guestRequest(ctx, SCSIModification.GuestRequest); err != nil {
+		return nil, fmt.Errorf("failed guest request to add SCSI disk: %s", err)
+	}
+
 	return sm, nil
 }
 

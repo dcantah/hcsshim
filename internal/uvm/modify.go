@@ -7,6 +7,7 @@ import (
 	"github.com/Microsoft/hcsshim/internal/log"
 	"github.com/Microsoft/hcsshim/internal/requesttype"
 	hcsschema "github.com/Microsoft/hcsshim/internal/schema2"
+	"github.com/pkg/errors"
 )
 
 // Modify modifies the compute system by sending a request to HCS.
@@ -43,6 +44,13 @@ func (uvm *UtilityVM) modify(ctx context.Context, doc *hcsschema.ModifySettingRe
 			log.G(ctx).WithError(err).Error("failed to remove host resources after successful guest request")
 			return err
 		}
+	}
+	return nil
+}
+
+func (uvm *UtilityVM) guestRequest(ctx context.Context, request interface{}) error {
+	if err := uvm.gc.Modify(ctx, request); err != nil {
+		return errors.Wrap(err, "guest modify")
 	}
 	return nil
 }

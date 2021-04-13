@@ -94,7 +94,7 @@ type VPMemManager interface {
 }
 
 type NetworkManager interface {
-	AddNIC(ctx context.Context, nicID guid.GUID, endpointID string, mac string) error
+	AddNIC(ctx context.Context, nicID string, endpointID string, mac string) error
 }
 
 // Stub for now, don't know what we need for Linux

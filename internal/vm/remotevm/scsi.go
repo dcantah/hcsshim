@@ -11,7 +11,7 @@ import (
 
 func (uvm *remoteVM) AddSCSIController(ctx context.Context, id uint32) error {
 	// TODO: dcantah
-	return vm.ErrNotSupported
+	return nil
 }
 
 func (uvm *remoteVM) AddSCSIDisk(ctx context.Context, controller uint32, lun uint32, path string, typ vm.SCSIDiskType, readOnly bool) error {

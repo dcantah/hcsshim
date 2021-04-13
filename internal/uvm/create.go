@@ -264,15 +264,16 @@ func (uvm *UtilityVM) Close() (err error) {
 	defer func() { oc.SetSpanStatus(span, err) }()
 	span.AddAttributes(trace.StringAttribute(logfields.UVMID, uvm.id))
 
-	windows.Close(uvm.vmmemProcess)
-
 	if uvm.hcsSystem != nil {
+		windows.Close(uvm.vmmemProcess)
+
 		if err := uvm.ReleaseCPUGroup(ctx); err != nil {
 			log.G(ctx).WithError(err).Warn("failed to release VM resource")
 		}
-		_ = uvm.hcsSystem.Terminate(ctx)
-		_ = uvm.Wait()
 	}
+
+	_ = uvm.u.Stop(ctx)
+	_ = uvm.Wait()
 
 	if err := uvm.CloseGCSConnection(); err != nil {
 		log.G(ctx).Errorf("close GCS connection failed: %s", err)
@@ -331,7 +332,7 @@ func (uvm *UtilityVM) IsOCI() bool {
 
 // Terminate requests that the utility VM be terminated.
 func (uvm *UtilityVM) Terminate(ctx context.Context) error {
-	return uvm.hcsSystem.Terminate(ctx)
+	return uvm.u.Stop(ctx)
 }
 
 // ExitError returns an error if the utility VM has terminated unexpectedly.
