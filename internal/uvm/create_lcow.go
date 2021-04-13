@@ -174,12 +174,6 @@ func CreateLCOW(ctx context.Context, opts *OptionsLCOW) (_ *UtilityVM, err error
 		createOpts:              opts,
 	}
 
-	defer func() {
-		if err != nil {
-			uvm.Close()
-		}
-	}()
-
 	kernelFullPath := filepath.Join(opts.BootFilesPath, opts.KernelFile)
 	if _, err := os.Stat(kernelFullPath); os.IsNotExist(err) {
 		return nil, fmt.Errorf("kernel: '%s' not found", kernelFullPath)
@@ -215,6 +209,12 @@ func CreateLCOW(ctx context.Context, opts *OptionsLCOW) (_ *UtilityVM, err error
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create new VM")
 	}
+
+	defer func() {
+		if err != nil {
+			uvm.Close()
+		}
+	}()
 
 	// To maintain compatability with Docker we need to automatically downgrade
 	// a user CPU count if the setting is not possible.

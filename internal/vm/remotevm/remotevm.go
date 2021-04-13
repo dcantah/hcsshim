@@ -2,7 +2,9 @@ package remotevm
 
 import (
 	"context"
+	"io"
 	"net"
+	"os"
 	"os/exec"
 
 	"github.com/Microsoft/hcsshim/internal/log"
@@ -35,9 +37,21 @@ func (s *source) NewLinuxUVM(ctx context.Context, id, owner string) (vm.UVM, err
 		}).Debug("starting remotevm server process")
 
 		cmd := exec.Command(s.binary, "--ttrpc", s.addr)
+		p, err := cmd.StdoutPipe()
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create stdout pipe")
+		}
+
 		if err := cmd.Start(); err != nil {
 			return nil, errors.Wrap(err, "failed to start remotevm server process")
 		}
+
+		f, err := os.Open(os.DevNull)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to open nul file")
+		}
+		// Wait for stdout to close
+		_, _ = io.Copy(f, p)
 	}
 
 	conn, err := net.Dial("unix", s.addr)

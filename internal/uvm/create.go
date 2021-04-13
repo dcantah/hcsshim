@@ -220,12 +220,16 @@ func newDefaultOptions(id, owner string) *Options {
 
 // ID returns the ID of the VM's compute system.
 func (uvm *UtilityVM) ID() string {
-	return uvm.hcsSystem.ID()
+	return uvm.u.ID()
 }
 
 // OS returns the operating system of the utility VM.
 func (uvm *UtilityVM) OS() string {
 	return uvm.operatingSystem
+}
+
+func (uvm *UtilityVM) U() vm.UVM {
+	return uvm.u
 }
 
 func (uvm *UtilityVM) create(ctx context.Context, doc interface{}) error {

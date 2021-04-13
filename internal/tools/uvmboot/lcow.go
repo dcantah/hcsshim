@@ -8,7 +8,9 @@ import (
 
 	"github.com/Microsoft/hcsshim/internal/cmd"
 	"github.com/Microsoft/hcsshim/internal/uvm"
+	"github.com/Microsoft/hcsshim/internal/vm"
 	"github.com/containerd/console"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
@@ -136,6 +138,10 @@ var lcowCommand = cli.Command{
 				options.ConsolePipe = c.String(consolePipeArgName)
 			}
 
+			options.VMSource = c.GlobalString("vmruntime")
+			options.VMServiceAddress = c.GlobalString("vmservice-address")
+			options.VMServicePath = c.GlobalString("vmservice-path")
+
 			if err := runLCOW(context.TODO(), options, c); err != nil {
 				return err
 			}
@@ -155,6 +161,12 @@ func runLCOW(ctx context.Context, options *uvm.OptionsLCOW, c *cli.Context) erro
 
 	if err := uvm.Start(ctx); err != nil {
 		return err
+	}
+
+	if path := c.GlobalString("vhd"); path != "" {
+		if err := uvm.U().AddSCSIDisk(ctx, 0, 10, path, vm.SCSIDiskTypeVHDX, true); err != nil {
+			return errors.Wrap(err, "failed to add scsi disk to vm")
+		}
 	}
 
 	if options.UseGuestConnection {

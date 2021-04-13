@@ -20,9 +20,9 @@ func (uvm *remoteVM) SetMemoryLimit(ctx context.Context, memoryMB uint64) error 
 }
 
 func (uvm *remoteVM) SetMemoryConfig(ctx context.Context, config *vm.MemoryConfig) error {
-	return vm.ErrNotSupported
+	return nil
 }
 
 func (uvm *remoteVM) SetMMIOConfig(ctx context.Context, lowGapMB uint64, highBaseMB uint64, highGapMB uint64) error {
-	return vm.ErrNotSupported
+	return nil
 }

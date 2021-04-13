@@ -74,6 +74,22 @@ func main() {
 			Name:  externalBridgeArgName,
 			Usage: "Use the external implementation of the guest connection",
 		},
+		cli.StringFlag{
+			Name:  "vmruntime",
+			Usage: "hcs or remotevm",
+			Value: "hcs",
+		},
+		cli.StringFlag{
+			Name:  "vmservice-address",
+			Usage: "Address to connect to vmservice ttrpc server",
+		},
+		cli.StringFlag{
+			Name:  "vmservice-path",
+			Usage: "Path to binary hosting vmservice server",
+		},
+		cli.StringFlag{
+			Name: "vhd",
+		},
 	}
 
 	app.Commands = []cli.Command{
