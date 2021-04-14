@@ -35,7 +35,8 @@ func (uvm *remoteVM) HVSocketListen(ctx context.Context, serviceID guid.GUID) (n
 		return nil, errors.Wrapf(err, "failed to listen on unix socket %q", f.Name())
 	}
 
-	if _, err := uvm.client.VMSocket(ctx, &vmservice.VMSocketRequest{
+	// TODO: dcantah why are we getting a context cancellation here if we use the passed in ctx
+	if _, err := uvm.client.VMSocket(context.Background(), &vmservice.VMSocketRequest{
 		Type: vmservice.ModifyType_ADD,
 		Config: &vmservice.VMSocketRequest_HvsocketList{
 			HvsocketList: &vmservice.HVSocketListen{

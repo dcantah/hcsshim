@@ -95,6 +95,9 @@ func (uvm *remoteVM) State() vm.State {
 }
 
 func (uvm *remoteVM) Create(ctx context.Context) error {
+	if uvm.state != vm.StatePreCreated {
+		return vm.ErrNotInPreCreatedState
+	}
 	if _, err := uvm.client.CreateVM(ctx, &vmservice.CreateVMRequest{Config: uvm.config, LogID: uvm.ID()}); err != nil {
 		return errors.Wrap(err, "failed to create remote VM")
 	}
@@ -103,6 +106,9 @@ func (uvm *remoteVM) Create(ctx context.Context) error {
 }
 
 func (uvm *remoteVM) Start(ctx context.Context) error {
+	if uvm.state != vm.StateCreated {
+		return vm.ErrNotInCreatedState
+	}
 	// The VM is expected to be in a pause state after Create, so start is truthfully just resuming the
 	// VM. This is really what HCS does behind the scenes anyways, it's just labeled as Start.
 	if _, err := uvm.client.ResumeVM(ctx, &ptypes.Empty{}); err != nil {
@@ -113,6 +119,9 @@ func (uvm *remoteVM) Start(ctx context.Context) error {
 }
 
 func (uvm *remoteVM) Stop(ctx context.Context) error {
+	if uvm.state != vm.StateRunning {
+		return vm.ErrNotInRunningState
+	}
 	if _, err := uvm.client.TeardownVM(ctx, &ptypes.Empty{}); err != nil {
 		return errors.Wrap(err, "failed to stop remote VM")
 	}
@@ -121,6 +130,12 @@ func (uvm *remoteVM) Stop(ctx context.Context) error {
 }
 
 func (uvm *remoteVM) Wait() error {
+	if uvm.state != vm.StateRunning {
+		return vm.ErrNotInRunningState
+	}
+	if uvm.state == vm.StateTerminated {
+		return nil
+	}
 	_, err := uvm.client.WaitVM(context.Background(), &ptypes.Empty{})
 	if err != nil {
 		uvm.waitError = err

@@ -10,14 +10,10 @@ import (
 )
 
 func (uvm *utilityVM) HVSocketListen(ctx context.Context, serviceID guid.GUID) (net.Listener, error) {
-	l, err := winio.ListenHvsock(&winio.HvsockAddr{
+	return winio.ListenHvsock(&winio.HvsockAddr{
 		VMID:      uvm.vmID,
 		ServiceID: serviceID,
 	})
-	if err != nil {
-		return nil, err
-	}
-	return l, nil
 }
 
 func (uvm *utilityVM) VSockListen(ctx context.Context, port uint32) (net.Listener, error) {
