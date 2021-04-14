@@ -55,10 +55,7 @@ func (uvm *utilityVM) addSCSIDiskCreatedRunning(ctx context.Context, controller 
 		},
 		ResourcePath: fmt.Sprintf("VirtualMachine/Devices/Scsi/%d/Attachments/%d", controller, lun),
 	}
-	if err := uvm.cs.Modify(ctx, request); err != nil {
-		return err
-	}
-	return nil
+	return uvm.cs.Modify(ctx, request)
 }
 
 func getSCSIDiskTypeString(typ vm.SCSIDiskType) (string, error) {

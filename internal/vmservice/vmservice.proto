@@ -98,12 +98,22 @@ message VMConfig {
     MemoryConfig memory_config = 1;
     ProcessorConfig processor_config = 2;
     DevicesConfig devices_config = 3;
+    SerialConfig serial_config = 4;
     oneof BootConfig {
-        DirectBoot direct_boot = 4;
-        UEFI uefi = 5;
+        DirectBoot direct_boot = 5;
+        UEFI uefi = 6;
     }
     // Optional k:v extra data. Up to the virtstack for how to interpret this.
-    map<string, string> extra_data = 6;
+    map<string, string> extra_data = 7;
+}
+
+message SerialConfig {
+    message Config {
+        uint32 port = 1;
+        // Uds to relay serial console output to.
+        string socket_path = 2;
+    }
+    repeated Config ports = 3;
 }
 
 message CreateVMRequest {

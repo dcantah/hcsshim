@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/Microsoft/hcsshim/internal/cmd"
@@ -164,7 +165,11 @@ func runLCOW(ctx context.Context, options *uvm.OptionsLCOW, c *cli.Context) erro
 	}
 
 	if path := c.GlobalString("vhd"); path != "" {
-		if err := uvm.U().AddSCSIDisk(ctx, 0, 10, path, vm.SCSIDiskTypeVHDX, true); err != nil {
+		diskType := vm.SCSIDiskTypeVHD1
+		if strings.ToLower(filepath.Ext(path)) == "vhdx" {
+			diskType = vm.SCSIDiskTypeVHDX
+		}
+		if err := uvm.U().AddSCSIDisk(ctx, 0, 1, path, diskType, true); err != nil {
 			return errors.Wrap(err, "failed to add scsi disk to vm")
 		}
 	}

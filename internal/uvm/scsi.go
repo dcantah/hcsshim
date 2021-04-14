@@ -332,7 +332,7 @@ func (uvm *UtilityVM) addSCSIActual(ctx context.Context, hostPath, uvmPath, atta
 	}
 
 	if err := uvm.guestRequest(ctx, SCSIModification.GuestRequest); err != nil {
-		return nil, fmt.Errorf("failed guest request to add SCSI disk: %s", err)
+		return nil, errors.Wrap(err, "failed guest request to add SCSI disk: %s")
 	}
 
 	return sm, nil
