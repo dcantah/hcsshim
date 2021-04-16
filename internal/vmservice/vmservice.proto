@@ -253,11 +253,12 @@ message ModifyVPMEMDiskRequest {
 }
 
 message NICConfig {
-    string port_id = 1;
-    string mac_address = 2;
-    string switch_id = 3;
+    string nic_id = 1; // GUID
+    string port_id = 2; // GUID
+    string mac_address = 3; // 12-34-56-78-9A-BC
+    string switch_id = 4; // GUID
     // Optional friendly name for the adapter. Might be useful to show up in logs.
-    string nic_name = 4;
+    string nic_name = 5;
 }
 
 message ModifyNICRequest {

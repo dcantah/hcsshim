@@ -60,6 +60,7 @@ func (uvm *remoteVM) AddNIC(ctx context.Context, nicID, endpointID, macAddr stri
 	}
 
 	nic := &vmservice.NICConfig{
+		NicID:      nicID,
 		MacAddress: macAddr,
 		PortID:     portID.String(),
 		SwitchID:   exi.Allocators[0].SwitchId,

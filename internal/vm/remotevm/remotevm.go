@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 
+	"github.com/Microsoft/hcsshim/internal/jobobject"
 	"github.com/Microsoft/hcsshim/internal/log"
 	"github.com/Microsoft/hcsshim/internal/vm"
 	"github.com/Microsoft/hcsshim/internal/vmservice"
@@ -36,6 +37,15 @@ func (s *source) NewLinuxUVM(ctx context.Context, id, owner string) (vm.UVM, err
 			"address": s.addr,
 		}).Debug("starting remotevm server process")
 
+		opts := &jobobject.Options{
+			Name: id,
+		}
+		job, err := jobobject.Create(ctx, opts)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create job object for remotevm process")
+		}
+
+		// TODO dcantah: This expects the remotevm server process to have a ttrpc flag. Revisit this later
 		cmd := exec.Command(s.binary, "--ttrpc", s.addr)
 		p, err := cmd.StdoutPipe()
 		if err != nil {
@@ -46,11 +56,19 @@ func (s *source) NewLinuxUVM(ctx context.Context, id, owner string) (vm.UVM, err
 			return nil, errors.Wrap(err, "failed to start remotevm server process")
 		}
 
+		if err := job.Assign(uint32(cmd.Process.Pid)); err != nil {
+			return nil, errors.Wrap(err, "failed to assign remotevm process to job")
+		}
+
+		if err := job.SetTerminateOnLastHandleClose(); err != nil {
+			return nil, errors.Wrap(err, "failed to set terminate on last handle closed for remotevm job object")
+		}
+
 		f, err := os.Open(os.DevNull)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to open nul file")
 		}
-		// Wait for stdout to close
+		// Wait for stdout to close. This is our signal that the server is successfully up and running.
 		_, _ = io.Copy(f, p)
 	}
 
