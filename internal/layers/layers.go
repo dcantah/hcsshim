@@ -13,6 +13,7 @@ import (
 	hcsschema "github.com/Microsoft/hcsshim/internal/schema2"
 	"github.com/Microsoft/hcsshim/internal/uvm"
 	uvmpkg "github.com/Microsoft/hcsshim/internal/uvm"
+	"github.com/Microsoft/hcsshim/internal/vm"
 	"github.com/Microsoft/hcsshim/internal/wclayer"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -207,10 +208,10 @@ func MountContainerLayers(ctx context.Context, layerFolders []string, guestRoot 
 }
 
 func addLCOWLayer(ctx context.Context, uvm *uvmpkg.UtilityVM, layerPath string) (uvmPath string, err error) {
-	// don't try to add as vpmem when we want additional devices on the uvm to be fully physically backed
+	// Don't try to add as vpmem when we want additional devices on the uvm to be fully physically backed
 	if !uvm.DevicesPhysicallyBacked() {
-		// We first try vPMEM and if it is full or the file is too large we
-		// fall back to SCSI.
+		// We first try vPMEM and if it is full, the file is too large or the virtstack doesn't support it,
+		// we fall back to SCSI.
 		uvmPath, err = uvm.AddVPMEM(ctx, layerPath)
 		if err == nil {
 			log.G(ctx).WithFields(logrus.Fields{
@@ -218,15 +219,15 @@ func addLCOWLayer(ctx context.Context, uvm *uvmpkg.UtilityVM, layerPath string) 
 				"layerType": "vpmem",
 			}).Debug("Added LCOW layer")
 			return uvmPath, nil
-		} else if err != uvmpkg.ErrNoAvailableLocation && err != uvmpkg.ErrMaxVPMEMLayerSize {
-			return "", fmt.Errorf("failed to add VPMEM layer: %s", err)
+		} else if err != uvmpkg.ErrNoAvailableLocation && err != uvmpkg.ErrMaxVPMEMLayerSize && err != vm.ErrNotSupported {
+			return "", errors.Wrap(err, "failed to add VPMEM layer")
 		}
 	}
 
 	uvmPath = fmt.Sprintf(uvmpkg.LCOWGlobalMountPrefix, uvm.UVMMountCounter())
 	sm, err := uvm.AddSCSI(ctx, layerPath, uvmPath, true, uvmpkg.VMAccessTypeNoop)
 	if err != nil {
-		return "", fmt.Errorf("failed to add SCSI layer: %s", err)
+		return "", errors.Wrap(err, "failed to add SCSI layer")
 	}
 	log.G(ctx).WithFields(logrus.Fields{
 		"layerPath": layerPath,

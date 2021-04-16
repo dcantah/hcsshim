@@ -14,6 +14,7 @@ var (
 	ErrNotInPreCreatedState = errors.New("VM is not in pre-created state")
 	ErrNotInCreatedState    = errors.New("VM is not in created state")
 	ErrNotInRunningState    = errors.New("VM is not in running state")
+	ErrNotInPausedState     = errors.New("VM is not in paused state")
 )
 
 type UVMSource interface {
@@ -32,14 +33,41 @@ const (
 type UVM interface {
 	// ID will return a string identifier for the Utility VM.
 	ID() string
+
 	// State returns the current running state of the Utility VM. e.g. Created, Running, Terminated
 	State() State
-	// Create
+
+	// Create will create the Utility VM in a paused/powered off state with whatever is present in the implementation
+	// of the interfaces config at the time of the call.
 	Create(ctx context.Context) error
+
+	// Start will power on the Utility VM and put it into a running state. This will boot the guest OS and start all of the
+	// devices configured on the machine.
 	Start(ctx context.Context) error
+
+	// Stop will shutdown the Utility VM and place it into a terminated state.
 	Stop(ctx context.Context) error
+
+	// Pause will place the Utility VM into a paused state. The guest OS will be halted and any devices will have be in a
+	// a suspended state. Save can be used to snapshot the current state of the virtual machine, and Resume can be used to
+	// place the virtual machine back into a running state.
+	Pause(ctx context.Context) error
+
+	// Resume will put a previously paused Utility VM back into a running state. The guest OS will resume operation from the point
+	// in time it was paused and all devices should be un-suspended.
+	Resume(ctx context.Context) error
+
+	// Save will snapshot the state of the Utility VM at the point in time when the VM was paused.
+	Save(ctx context.Context) error
+
+	// Wait synchronously waits for the Utility VM to shutdown or terminate. A call to stop will trigger this
+	// to unblock.
 	Wait() error
+
+	// ExitError will return any error if the Utility VM exited unexpectedly, or if the Utility VM experienced an
+	// error after Wait returned, it will return the wait error.
 	ExitError() error
+
 	MemoryManager
 	ProcessorManager
 	BootManager
@@ -95,7 +123,7 @@ type VPMemManager interface {
 }
 
 type NetworkManager interface {
-	AddNIC(ctx context.Context, nicID string, endpointID string, mac string) error
+	AddNIC(ctx context.Context, nicID string, endpointID string, macAddr string) error
 }
 
 // Stub for now, don't know what we need for Linux

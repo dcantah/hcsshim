@@ -253,10 +253,10 @@ message ModifyVPMEMDiskRequest {
 }
 
 message NICConfig {
-    string nic_id = 1;
+    string port_id = 1;
     string mac_address = 2;
-    string port_id = 3;
-    // Optional friendly name for the adapter.
+    string switch_id = 3;
+    // Optional friendly name for the adapter. Might be useful to show up in logs.
     string nic_name = 4;
 }
 

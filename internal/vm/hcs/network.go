@@ -8,13 +8,13 @@ import (
 	hcsschema "github.com/Microsoft/hcsshim/internal/schema2"
 )
 
-func (uvm *utilityVM) AddNIC(ctx context.Context, nicID string, endpointID string, mac string) error {
+func (uvm *utilityVM) AddNIC(ctx context.Context, nicID, endpointID, macAddr string) error {
 	request := hcsschema.ModifySettingRequest{
 		RequestType:  requesttype.Add,
 		ResourcePath: fmt.Sprintf("VirtualMachine/Devices/NetworkAdapters/%s", nicID),
 		Settings: hcsschema.NetworkAdapter{
 			EndpointId: endpointID,
-			MacAddress: mac,
+			MacAddress: macAddr,
 		},
 	}
 	return uvm.cs.Modify(ctx, request)

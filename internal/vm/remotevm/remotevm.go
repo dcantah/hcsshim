@@ -144,6 +144,27 @@ func (uvm *remoteVM) Wait() error {
 	return nil
 }
 
+func (uvm *remoteVM) Pause(ctx context.Context) error {
+	return vm.ErrNotSupported
+}
+
+func (uvm *remoteVM) Resume(ctx context.Context) error {
+	if uvm.state != vm.StatePaused {
+		return vm.ErrNotInPausedState
+	}
+	// Unlike HCS, resume can be called both after create to power on the devices/boot the guest OS
+	// and also after pausing the VM.
+	if _, err := uvm.client.ResumeVM(ctx, &ptypes.Empty{}); err != nil {
+		return errors.Wrap(err, "failed to resume remote VM")
+	}
+	uvm.state = vm.StateRunning
+	return nil
+}
+
+func (uvm *remoteVM) Save(ctx context.Context) error {
+	return vm.ErrNotSupported
+}
+
 func (uvm *remoteVM) ExitError() error {
 	return uvm.waitError
 }

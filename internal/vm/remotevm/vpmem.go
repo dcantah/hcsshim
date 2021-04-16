@@ -7,9 +7,9 @@ import (
 )
 
 func (uvm *remoteVM) AddVPMemController(ctx context.Context, maximumDevices uint32, maximumSizeBytes uint64) error {
-	return nil
+	return vm.ErrNotSupported
 }
 
 func (uvm *remoteVM) AddVPMemDevice(ctx context.Context, id uint32, path string, readOnly bool, imageFormat vm.VPMemImageFormat) error {
-	return nil
+	return vm.ErrNotSupported
 }

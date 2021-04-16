@@ -101,7 +101,7 @@ func (uvm *utilityVM) Start(ctx context.Context) (err error) {
 		return vm.ErrNotInCreatedState
 	}
 	if err := uvm.cs.Start(ctx); err != nil {
-		return err
+		return errors.Wrap(err, "failed to start utility VM")
 	}
 	uvm.state = vm.StateRunning
 	return nil
@@ -112,9 +112,44 @@ func (uvm *utilityVM) Stop(ctx context.Context) error {
 		return vm.ErrNotInRunningState
 	}
 	if err := uvm.cs.Terminate(ctx); err != nil {
-		return err
+		return errors.Wrap(err, "failed to terminate utility VM")
 	}
 	uvm.state = vm.StateTerminated
+	return nil
+}
+
+func (uvm *utilityVM) Pause(ctx context.Context) error {
+	if uvm.state != vm.StateCreated {
+		return vm.ErrNotInRunningState
+	}
+	if err := uvm.cs.Pause(ctx); err != nil {
+		return errors.Wrap(err, "failed to pause utility VM")
+	}
+	uvm.state = vm.StatePaused
+	return nil
+}
+
+func (uvm *utilityVM) Resume(ctx context.Context) error {
+	if uvm.state != vm.StatePaused {
+		return vm.ErrNotInPausedState
+	}
+	if err := uvm.cs.Resume(ctx); err != nil {
+		return errors.Wrap(err, "failed to resume utility VM")
+	}
+	uvm.state = vm.StateRunning
+	return nil
+}
+
+func (uvm *utilityVM) Save(ctx context.Context) error {
+	if uvm.state != vm.StatePaused {
+		return vm.ErrNotInPausedState
+	}
+	saveOptions := hcsschema.SaveOptions{
+		SaveType: "AsTemplate",
+	}
+	if err := uvm.cs.Save(ctx, saveOptions); err != nil {
+		return errors.Wrap(err, "failed to save utility VM state")
+	}
 	return nil
 }
 
