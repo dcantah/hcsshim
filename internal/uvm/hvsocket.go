@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/Microsoft/hcsshim/internal/requesttype"
+	"github.com/Microsoft/hcsshim/internal/resourcepath"
 	hcsschema "github.com/Microsoft/hcsshim/internal/schema2"
 )
 
@@ -27,7 +28,7 @@ import (
 func (uvm *UtilityVM) UpdateHvSocketService(ctx context.Context, sid string, doc *hcsschema.HvSocketServiceConfig) error {
 	request := &hcsschema.ModifySettingRequest{
 		RequestType:  requesttype.Update,
-		ResourcePath: fmt.Sprintf(hvsocketConfigResourceFormat, sid),
+		ResourcePath: fmt.Sprintf(resourcepath.HvSocketConfigResourceFormat, sid),
 		Settings:     doc,
 	}
 	return uvm.modify(ctx, request)
@@ -37,7 +38,7 @@ func (uvm *UtilityVM) UpdateHvSocketService(ctx context.Context, sid string, doc
 func (uvm *UtilityVM) RemoveHvSocketService(ctx context.Context, sid string) error {
 	request := &hcsschema.ModifySettingRequest{
 		RequestType:  requesttype.Remove,
-		ResourcePath: fmt.Sprintf(hvsocketConfigResourceFormat, sid),
+		ResourcePath: fmt.Sprintf(resourcepath.HvSocketConfigResourceFormat, sid),
 	}
 	return uvm.modify(ctx, request)
 }

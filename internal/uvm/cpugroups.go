@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/Microsoft/hcsshim/internal/cpugroup"
+	"github.com/Microsoft/hcsshim/internal/resourcepath"
 	hcsschema "github.com/Microsoft/hcsshim/internal/schema2"
 )
 
@@ -33,7 +34,7 @@ func (uvm *UtilityVM) SetCPUGroup(ctx context.Context, id string) error {
 // setCPUGroup sets the VM's cpugroup
 func (uvm *UtilityVM) setCPUGroup(ctx context.Context, id string) error {
 	req := &hcsschema.ModifySettingRequest{
-		ResourcePath: cpuGroupResourcePath,
+		ResourcePath: resourcepath.CPUGroupResourcePath,
 		Settings: &hcsschema.CpuGroup{
 			Id: id,
 		},

@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/Microsoft/hcsshim/internal/requesttype"
+	"github.com/Microsoft/hcsshim/internal/resourcepath"
 	hcsschema "github.com/Microsoft/hcsshim/internal/schema2"
 	"github.com/Microsoft/hcsshim/internal/vm"
 	"github.com/pkg/errors"
@@ -42,7 +43,7 @@ func (uvm *utilityVM) RemoveSCSIDisk(ctx context.Context, controller uint32, lun
 
 	request := &hcsschema.ModifySettingRequest{
 		RequestType:  requesttype.Remove,
-		ResourcePath: fmt.Sprintf("VirtualMachine/Devices/Scsi/%d/Attachments/%d", controller, lun),
+		ResourcePath: fmt.Sprintf(resourcepath.ScsiResourceFormat, strconv.Itoa(int(controller)), lun),
 	}
 
 	return uvm.cs.Modify(ctx, request)
@@ -64,7 +65,7 @@ func (uvm *utilityVM) addSCSIDiskCreatedRunning(ctx context.Context, controller 
 			Type_:    diskTypeString,
 			ReadOnly: readOnly,
 		},
-		ResourcePath: fmt.Sprintf("VirtualMachine/Devices/Scsi/%d/Attachments/%d", controller, lun),
+		ResourcePath: fmt.Sprintf(resourcepath.ScsiResourceFormat, strconv.Itoa(int(controller)), lun),
 	}
 	return uvm.cs.Modify(ctx, request)
 }

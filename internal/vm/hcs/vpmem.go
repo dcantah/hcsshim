@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/Microsoft/hcsshim/internal/requesttype"
+	"github.com/Microsoft/hcsshim/internal/resourcepath"
 	hcsschema "github.com/Microsoft/hcsshim/internal/schema2"
 	"github.com/Microsoft/hcsshim/internal/vm"
 	"github.com/pkg/errors"
@@ -42,7 +43,7 @@ func (uvm *utilityVM) RemoveVPMemDevice(ctx context.Context, id uint32, path str
 	}
 	request := &hcsschema.ModifySettingRequest{
 		RequestType:  requesttype.Remove,
-		ResourcePath: fmt.Sprintf("VirtualMachine/Devices/VirtualPMem/Devices/%d", id),
+		ResourcePath: fmt.Sprintf(resourcepath.VPMemControllerResourceFormat, id),
 	}
 	return uvm.cs.Modify(ctx, request)
 }
@@ -78,7 +79,7 @@ func (uvm *utilityVM) addVPMemDeviceCreatedRunning(ctx context.Context, id uint3
 			ReadOnly:    readOnly,
 			ImageFormat: imageFormatString,
 		},
-		ResourcePath: fmt.Sprintf("VirtualMachine/Devices/VirtualPMem/Devices/%d", id),
+		ResourcePath: fmt.Sprintf(resourcepath.VPMemControllerResourceFormat, id),
 	}
 	return uvm.cs.Modify(ctx, request)
 }

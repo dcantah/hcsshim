@@ -8,6 +8,7 @@ import (
 
 	"github.com/Microsoft/hcsshim/internal/guestrequest"
 	"github.com/Microsoft/hcsshim/internal/requesttype"
+	"github.com/Microsoft/hcsshim/internal/resourcepath"
 	hcsschema "github.com/Microsoft/hcsshim/internal/schema2"
 	"github.com/Microsoft/hcsshim/osversion"
 )
@@ -77,7 +78,7 @@ func (uvm *UtilityVM) AddPlan9(ctx context.Context, hostPath string, uvmPath str
 			Flags:        flags,
 			AllowedFiles: allowedNames,
 		},
-		ResourcePath: plan9ShareResourcePath,
+		ResourcePath: resourcepath.Plan9ShareResourcePath,
 		GuestRequest: guestrequest.GuestRequest{
 			ResourceType: guestrequest.ResourceTypeMappedDirectory,
 			RequestType:  requesttype.Add,
@@ -115,7 +116,7 @@ func (uvm *UtilityVM) RemovePlan9(ctx context.Context, share *Plan9Share) error 
 			AccessName: share.name,
 			Port:       plan9Port,
 		},
-		ResourcePath: plan9ShareResourcePath,
+		ResourcePath: resourcepath.Plan9ShareResourcePath,
 		GuestRequest: guestrequest.GuestRequest{
 			ResourceType: guestrequest.ResourceTypeMappedDirectory,
 			RequestType:  requesttype.Remove,

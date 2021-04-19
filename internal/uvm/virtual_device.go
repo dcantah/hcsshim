@@ -7,6 +7,7 @@ import (
 	"github.com/Microsoft/go-winio/pkg/guid"
 	"github.com/Microsoft/hcsshim/internal/guestrequest"
 	"github.com/Microsoft/hcsshim/internal/requesttype"
+	"github.com/Microsoft/hcsshim/internal/resourcepath"
 	hcsschema "github.com/Microsoft/hcsshim/internal/schema2"
 )
 
@@ -92,7 +93,7 @@ func (uvm *UtilityVM) AssignDevice(ctx context.Context, deviceID string) (*VPCID
 	}
 
 	request := &hcsschema.ModifySettingRequest{
-		ResourcePath: fmt.Sprintf(virtualPciResourceFormat, vmBusGUID),
+		ResourcePath: fmt.Sprintf(resourcepath.VirtualPciResourceFormat, vmBusGUID),
 		RequestType:  requesttype.Add,
 		Settings:     targetDevice}
 
@@ -140,7 +141,7 @@ func (uvm *UtilityVM) removeDevice(ctx context.Context, deviceInstanceID string)
 	if vpci.refCount == 0 {
 		delete(uvm.vpciDevices, deviceInstanceID)
 		return uvm.modify(ctx, &hcsschema.ModifySettingRequest{
-			ResourcePath: fmt.Sprintf(virtualPciResourceFormat, vpci.VMBusGUID),
+			ResourcePath: fmt.Sprintf(resourcepath.VirtualPciResourceFormat, vpci.VMBusGUID),
 			RequestType:  requesttype.Remove,
 		})
 	}

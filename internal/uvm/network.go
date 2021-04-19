@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/Microsoft/hcsshim/internal/ncproxyttrpc"
+	"github.com/Microsoft/hcsshim/internal/resourcepath"
 	"github.com/pkg/errors"
 
 	"github.com/Microsoft/go-winio/pkg/guid"
@@ -633,7 +634,7 @@ func (uvm *UtilityVM) RemoveAllNICs(ctx context.Context) error {
 func (uvm *UtilityVM) UpdateNIC(ctx context.Context, id string, settings *hcsschema.NetworkAdapter) error {
 	req := &hcsschema.ModifySettingRequest{
 		RequestType:  requesttype.Update,
-		ResourcePath: fmt.Sprintf(networkResourceFormat, id),
+		ResourcePath: fmt.Sprintf(resourcepath.NetworkResourceFormat, id),
 		Settings:     settings,
 	}
 	return uvm.modify(ctx, req)

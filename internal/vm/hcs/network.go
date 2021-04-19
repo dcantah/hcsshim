@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/Microsoft/hcsshim/internal/requesttype"
+	"github.com/Microsoft/hcsshim/internal/resourcepath"
 	hcsschema "github.com/Microsoft/hcsshim/internal/schema2"
 	"github.com/Microsoft/hcsshim/internal/vm"
 )
@@ -15,7 +16,7 @@ func (uvm *utilityVM) AddNIC(ctx context.Context, nicID, endpointID, macAddr str
 	}
 	request := hcsschema.ModifySettingRequest{
 		RequestType:  requesttype.Add,
-		ResourcePath: fmt.Sprintf("VirtualMachine/Devices/NetworkAdapters/%s", nicID),
+		ResourcePath: fmt.Sprintf(resourcepath.NetworkResourceFormat, nicID),
 		Settings: hcsschema.NetworkAdapter{
 			EndpointId: endpointID,
 			MacAddress: macAddr,
@@ -30,7 +31,7 @@ func (uvm *utilityVM) RemoveNIC(ctx context.Context, nicID, endpointID, macAddr 
 	}
 	request := hcsschema.ModifySettingRequest{
 		RequestType:  requesttype.Remove,
-		ResourcePath: fmt.Sprintf("VirtualMachine/Devices/NetworkAdapters/%s", nicID),
+		ResourcePath: fmt.Sprintf(resourcepath.NetworkResourceFormat, nicID),
 		Settings: hcsschema.NetworkAdapter{
 			EndpointId: endpointID,
 			MacAddress: macAddr,
