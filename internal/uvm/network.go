@@ -528,26 +528,24 @@ func getNetworkModifyRequest(adapterID string, requestType string, settings inte
 
 // addNIC adds a nic to the Utility VM.
 func (uvm *UtilityVM) addNIC(ctx context.Context, id string, endpoint *hns.HNSEndpoint) error {
-	request := hcsschema.ModifySettingRequest{}
+	var guestReq guestrequest.GuestRequest
 	// First a pre-add. This is a guest-only request and is only done on Windows.
 	if uvm.operatingSystem == "windows" {
-		preAddRequest := hcsschema.ModifySettingRequest{
-			GuestRequest: guestrequest.GuestRequest{
-				ResourceType: guestrequest.ResourceTypeNetwork,
-				RequestType:  requesttype.Add,
-				Settings: getNetworkModifyRequest(
-					id,
-					requesttype.PreAdd,
-					endpoint),
-			},
+		preAddReq := guestrequest.GuestRequest{
+			ResourceType: guestrequest.ResourceTypeNetwork,
+			RequestType:  requesttype.Add,
+			Settings: getNetworkModifyRequest(
+				id,
+				requesttype.PreAdd,
+				endpoint),
 		}
-		if err := uvm.modify(ctx, &preAddRequest); err != nil {
-			return err
+		if err := uvm.GuestRequest(ctx, preAddReq); err != nil {
+			return errors.Wrap(err, "failed pre-add for network adapter")
 		}
 	}
 
 	if uvm.operatingSystem == "windows" {
-		request.GuestRequest = guestrequest.GuestRequest{
+		guestReq = guestrequest.GuestRequest{
 			ResourceType: guestrequest.ResourceTypeNetwork,
 			RequestType:  requesttype.Add,
 			Settings: getNetworkModifyRequest(
@@ -558,7 +556,7 @@ func (uvm *UtilityVM) addNIC(ctx context.Context, id string, endpoint *hns.HNSEn
 	} else {
 		// Verify this version of LCOW supports Network HotAdd
 		if uvm.isNetworkNamespaceSupported() {
-			request.GuestRequest = guestrequest.GuestRequest{
+			guestReq = guestrequest.GuestRequest{
 				ResourceType: guestrequest.ResourceTypeNetwork,
 				RequestType:  requesttype.Add,
 				Settings: &guestrequest.LCOWNetworkAdapter{
@@ -578,20 +576,13 @@ func (uvm *UtilityVM) addNIC(ctx context.Context, id string, endpoint *hns.HNSEn
 	}
 
 	if err := uvm.u.AddNIC(ctx, id, endpoint.Id, endpoint.MacAddress); err != nil {
-		return errors.Wrap(err, "failed to add NIC to VM")
+		return errors.Wrap(err, "failed to add NIC to Utility VM")
 	}
-	return uvm.guestRequest(ctx, request.GuestRequest)
+	return uvm.GuestRequest(ctx, guestReq)
 }
 
 func (uvm *UtilityVM) removeNIC(ctx context.Context, id string, endpoint *hns.HNSEndpoint) error {
-	request := hcsschema.ModifySettingRequest{
-		RequestType:  requesttype.Remove,
-		ResourcePath: fmt.Sprintf(networkResourceFormat, id),
-		Settings: hcsschema.NetworkAdapter{
-			EndpointId: endpoint.Id,
-			MacAddress: endpoint.MacAddress,
-		},
-	}
+	request := hcsschema.ModifySettingRequest{}
 
 	if uvm.operatingSystem == "windows" {
 		request.GuestRequest = hcsschema.ModifySettingRequest{
@@ -615,9 +606,14 @@ func (uvm *UtilityVM) removeNIC(ctx context.Context, id string, endpoint *hns.HN
 		}
 	}
 
-	if err := uvm.modify(ctx, &request); err != nil {
-		return err
+	if err := uvm.GuestRequest(ctx, request.GuestRequest); err != nil {
+		return errors.Wrap(err, "failed to remove NIC from the guest")
 	}
+
+	if err := uvm.u.RemoveNIC(ctx, id, endpoint.Id, endpoint.MacAddress); err != nil {
+		return errors.Wrap(err, "failed to remove NIC from Utility VM")
+	}
+
 	return nil
 }
 

@@ -1,4 +1,4 @@
-package uvm
+package hcs
 
 import (
 	"context"
@@ -8,6 +8,8 @@ import (
 	"github.com/Microsoft/go-winio/pkg/process"
 	"github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/stats"
 	"github.com/Microsoft/hcsshim/internal/log"
+	hcsschema "github.com/Microsoft/hcsshim/internal/schema2"
+	"github.com/Microsoft/hcsshim/internal/vm"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows"
@@ -98,14 +100,62 @@ func lookupVMMEM(ctx context.Context, vmID guid.GUID) (proc windows.Handle, err 
 // getVMMEMProcess returns a handle to the vmmem process associated with this
 // UVM. It only does the actual process lookup once, after which it caches the
 // process handle in the UVM object.
-func (uvm *UtilityVM) getVMMEMProcess(ctx context.Context) (windows.Handle, error) {
+func (uvm *utilityVM) getVMMEMProcess(ctx context.Context) (windows.Handle, error) {
 	uvm.vmmemOnce.Do(func() {
-		uvm.vmmemProcess, uvm.vmmemErr = lookupVMMEM(ctx, uvm.runtimeID)
+		uvm.vmmemProcess, uvm.vmmemErr = lookupVMMEM(ctx, uvm.vmID)
 	})
 	return uvm.vmmemProcess, uvm.vmmemErr
 }
 
-// Stats returns various UVM statistics.
-func (uvm *UtilityVM) Stats(ctx context.Context) (*stats.VirtualMachineStatistics, error) {
-	return uvm.u.Stats(ctx)
+func (uvm *utilityVM) Stats(ctx context.Context) (*stats.VirtualMachineStatistics, error) {
+	if uvm.state != vm.StateRunning {
+		return nil, vm.ErrNotInRunningState
+	}
+
+	s := &stats.VirtualMachineStatistics{}
+	props, err := uvm.cs.PropertiesV2(ctx, hcsschema.PTStatistics, hcsschema.PTMemory)
+	if err != nil {
+		return nil, err
+	}
+
+	s.Processor = &stats.VirtualMachineProcessorStatistics{}
+	s.Processor.TotalRuntimeNS = uint64(props.Statistics.Processor.TotalRuntime100ns * 100)
+	s.Memory = &stats.VirtualMachineMemoryStatistics{}
+
+	if !uvm.doc.VirtualMachine.ComputeTopology.Memory.AllowOvercommit {
+		// If the uvm is physically backed we set the working set to the total amount allocated
+		// to the UVM. AssignedMemory returns the number of 4KB pages. Will always be 4KB
+		// regardless of what the UVMs actual page size is so we don't need that information.
+		if props.Memory != nil {
+			s.Memory.WorkingSetBytes = props.Memory.VirtualMachineMemory.AssignedMemory * 4096
+		}
+	} else {
+		// The HCS properties does not return sufficient information to calculate
+		// working set size for a VA-backed UVM. To work around this, we instead
+		// locate the vmmem process for the VM, and query that process's working set
+		// instead, which will be the working set for the VM.
+		vmmemProc, err := uvm.getVMMEMProcess(ctx)
+		if err != nil {
+			return nil, err
+		}
+		memCounters, err := process.GetProcessMemoryInfo(vmmemProc)
+		if err != nil {
+			return nil, err
+		}
+		s.Memory.WorkingSetBytes = uint64(memCounters.WorkingSetSize)
+	}
+
+	if props.Memory != nil {
+		s.Memory.VirtualNodeCount = props.Memory.VirtualNodeCount
+		s.Memory.VmMemory = &stats.VirtualMachineMemory{}
+		s.Memory.VmMemory.AvailableMemory = props.Memory.VirtualMachineMemory.AvailableMemory
+		s.Memory.VmMemory.AvailableMemoryBuffer = props.Memory.VirtualMachineMemory.AvailableMemoryBuffer
+		s.Memory.VmMemory.ReservedMemory = props.Memory.VirtualMachineMemory.ReservedMemory
+		s.Memory.VmMemory.AssignedMemory = props.Memory.VirtualMachineMemory.AssignedMemory
+		s.Memory.VmMemory.SlpActive = props.Memory.VirtualMachineMemory.SlpActive
+		s.Memory.VmMemory.BalancingEnabled = props.Memory.VirtualMachineMemory.BalancingEnabled
+		s.Memory.VmMemory.DmOperationInProgress = props.Memory.VirtualMachineMemory.DmOperationInProgress
+	}
+
+	return s, nil
 }

@@ -13,3 +13,7 @@ func (uvm *remoteVM) AddVPMemController(ctx context.Context, maximumDevices uint
 func (uvm *remoteVM) AddVPMemDevice(ctx context.Context, id uint32, path string, readOnly bool, imageFormat vm.VPMemImageFormat) error {
 	return vm.ErrNotSupported
 }
+
+func (uvm *remoteVM) RemoveVPMemDevice(ctx context.Context, id uint32, path string) error {
+	return vm.ErrNotSupported
+}

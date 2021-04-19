@@ -219,7 +219,7 @@ func addLCOWLayer(ctx context.Context, uvm *uvmpkg.UtilityVM, layerPath string) 
 				"layerType": "vpmem",
 			}).Debug("Added LCOW layer")
 			return uvmPath, nil
-		} else if err != uvmpkg.ErrNoAvailableLocation && err != uvmpkg.ErrMaxVPMEMLayerSize && err != vm.ErrNotSupported {
+		} else if err != uvmpkg.ErrNoAvailableLocation && err != uvmpkg.ErrMaxVPMEMLayerSize && !errors.Is(err, vm.ErrNotSupported) {
 			return "", errors.Wrap(err, "failed to add VPMEM layer")
 		}
 	}

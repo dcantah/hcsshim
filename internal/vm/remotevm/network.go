@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/Microsoft/go-winio/pkg/guid"
 	"github.com/Microsoft/hcsshim/hcn"
@@ -55,15 +56,26 @@ func (uvm *remoteVM) AddNIC(ctx context.Context, nicID, endpointID, macAddr stri
 		return errors.Wrapf(err, "failed to unmarshal resource data from endpoint %q", endpointID)
 	}
 
-	if len(exi.Allocators) != 1 {
+	if len(exi.Allocators) == 0 {
 		return errors.New("no resource data found for endpoint")
+	}
+
+	// NIC should only ever belong to one switch but there are cases where there's more than one allocator
+	// in the returned data. It seems they only ever contain empty strings so search for the first entry
+	// that actually contains a switch ID and that has the matching port GUID we made earlier.
+	var switchID string
+	for _, allocator := range exi.Allocators {
+		if allocator.SwitchId != "" && strings.ToLower(allocator.EndpointPortGuid) == portID.String() {
+			switchID = allocator.SwitchId
+			break
+		}
 	}
 
 	nic := &vmservice.NICConfig{
 		NicID:      nicID,
 		MacAddress: macAddr,
 		PortID:     portID.String(),
-		SwitchID:   exi.Allocators[0].SwitchId,
+		SwitchID:   switchID,
 	}
 
 	switch uvm.state {
@@ -85,5 +97,9 @@ func (uvm *remoteVM) AddNIC(ctx context.Context, nicID, endpointID, macAddr stri
 		return errors.New("VM is not in pre-created or running state")
 	}
 
+	return nil
+}
+
+func (uvm *remoteVM) RemoveNIC(ctx context.Context, nicID, endpointID, macAddr string) error {
 	return nil
 }

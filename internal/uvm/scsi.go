@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strconv"
 
 	"github.com/Microsoft/go-winio/pkg/security"
 	"github.com/Microsoft/hcsshim/internal/copyfile"
@@ -172,10 +171,7 @@ func (uvm *UtilityVM) RemoveSCSI(ctx context.Context, hostPath string) error {
 		return nil
 	}
 
-	scsiModification := &hcsschema.ModifySettingRequest{
-		RequestType:  requesttype.Remove,
-		ResourcePath: fmt.Sprintf(scsiResourceFormat, strconv.Itoa(sm.Controller), sm.LUN),
-	}
+	var guestReq guestrequest.GuestRequest
 
 	// Include the GuestRequest so that the GCS ejects the disk cleanly if the
 	// disk was attached/mounted
@@ -184,7 +180,7 @@ func (uvm *UtilityVM) RemoveSCSI(ctx context.Context, hostPath string) error {
 	// so that we synchronize the guest state. This seems to always avoid SCSI
 	// related errors if this index quickly reused by another container.
 	if uvm.operatingSystem == "windows" && sm.UVMPath != "" {
-		scsiModification.GuestRequest = guestrequest.GuestRequest{
+		guestReq = guestrequest.GuestRequest{
 			ResourceType: guestrequest.ResourceTypeMappedVirtualDisk,
 			RequestType:  requesttype.Remove,
 			Settings: guestrequest.WCOWMappedVirtualDisk{
@@ -193,7 +189,7 @@ func (uvm *UtilityVM) RemoveSCSI(ctx context.Context, hostPath string) error {
 			},
 		}
 	} else {
-		scsiModification.GuestRequest = guestrequest.GuestRequest{
+		guestReq = guestrequest.GuestRequest{
 			ResourceType: guestrequest.ResourceTypeMappedVirtualDisk,
 			RequestType:  requesttype.Remove,
 			Settings: guestrequest.LCOWMappedVirtualDisk{
@@ -204,9 +200,14 @@ func (uvm *UtilityVM) RemoveSCSI(ctx context.Context, hostPath string) error {
 		}
 	}
 
-	if err := uvm.modify(ctx, scsiModification); err != nil {
-		return fmt.Errorf("failed to remove SCSI disk %s from container %s: %s", hostPath, uvm.id, err)
+	if err := uvm.GuestRequest(ctx, guestReq); err != nil {
+		return errors.Wrap(err, "failed guest request to remove SCSI disk: %s")
 	}
+
+	if err := uvm.u.RemoveSCSIDisk(ctx, uint32(sm.Controller), uint32(sm.LUN), hostPath); err != nil {
+		return errors.Wrap(err, "failed to remove SCSI disk")
+	}
+
 	log.G(ctx).WithFields(sm.logFormat()).Debug("removed SCSI location")
 	uvm.scsiLocations[sm.Controller][sm.LUN] = nil
 	return nil
@@ -278,18 +279,9 @@ func (uvm *UtilityVM) addSCSIActual(ctx context.Context, hostPath, uvmPath, atta
 		return nil, ErrTooManyAttachments
 	}
 
-	SCSIModification := &hcsschema.ModifySettingRequest{
-		RequestType: requesttype.Add,
-		Settings: hcsschema.Attachment{
-			Path:     sm.HostPath,
-			Type_:    attachmentType,
-			ReadOnly: readOnly,
-		},
-		ResourcePath: fmt.Sprintf(scsiResourceFormat, strconv.Itoa(sm.Controller), sm.LUN),
-	}
-
+	var guestReq guestrequest.GuestRequest
 	if sm.UVMPath != "" {
-		guestReq := guestrequest.GuestRequest{
+		guestReq = guestrequest.GuestRequest{
 			ResourceType: guestrequest.ResourceTypeMappedVirtualDisk,
 			RequestType:  requesttype.Add,
 		}
@@ -307,7 +299,6 @@ func (uvm *UtilityVM) addSCSIActual(ctx context.Context, hostPath, uvmPath, atta
 				ReadOnly:   readOnly,
 			}
 		}
-		SCSIModification.GuestRequest = guestReq
 	}
 
 	var diskType vm.SCSIDiskType
@@ -331,7 +322,7 @@ func (uvm *UtilityVM) addSCSIActual(ctx context.Context, hostPath, uvmPath, atta
 		return nil, errors.Wrap(err, "failed to add SCSI disk")
 	}
 
-	if err := uvm.guestRequest(ctx, SCSIModification.GuestRequest); err != nil {
+	if err := uvm.GuestRequest(ctx, guestReq); err != nil {
 		return nil, errors.Wrap(err, "failed guest request to add SCSI disk: %s")
 	}
 

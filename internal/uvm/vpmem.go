@@ -2,14 +2,14 @@ package uvm
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 
 	"github.com/Microsoft/hcsshim/internal/guestrequest"
 	"github.com/Microsoft/hcsshim/internal/log"
 	"github.com/Microsoft/hcsshim/internal/requesttype"
-	hcsschema "github.com/Microsoft/hcsshim/internal/schema2"
+	"github.com/Microsoft/hcsshim/internal/vm"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -83,18 +83,8 @@ func (uvm *UtilityVM) AddVPMEM(ctx context.Context, hostPath string) (_ string, 
 			return "", err
 		}
 
-		modification := &hcsschema.ModifySettingRequest{
-			RequestType: requesttype.Add,
-			Settings: hcsschema.VirtualPMemDevice{
-				HostPath:    hostPath,
-				ReadOnly:    true,
-				ImageFormat: "Vhd1",
-			},
-			ResourcePath: fmt.Sprintf(vPMemControllerResourceFormat, deviceNumber),
-		}
-
 		uvmPath := fmt.Sprintf(lcowVPMEMLayerFmt, deviceNumber)
-		modification.GuestRequest = guestrequest.GuestRequest{
+		guestReq := guestrequest.GuestRequest{
 			ResourceType: guestrequest.ResourceTypeVPMemDevice,
 			RequestType:  requesttype.Add,
 			Settings: guestrequest.LCOWMappedVPMemDevice{
@@ -103,8 +93,12 @@ func (uvm *UtilityVM) AddVPMEM(ctx context.Context, hostPath string) (_ string, 
 			},
 		}
 
-		if err := uvm.modify(ctx, modification); err != nil {
-			return "", fmt.Errorf("uvm::AddVPMEM: failed to modify utility VM configuration: %s", err)
+		if err := uvm.u.AddVPMemDevice(ctx, deviceNumber, hostPath, true, vm.VPMemImageFormatVHD1); err != nil {
+			return "", errors.Wrap(err, "failed to add vpmem disk")
+		}
+
+		if err := uvm.GuestRequest(ctx, guestReq); err != nil {
+			return "", errors.Wrap(err, "failed guest request to add vpmem disk: %s")
 		}
 
 		uvm.vpmemDevices[deviceNumber] = &vpmemInfo{
@@ -136,22 +130,23 @@ func (uvm *UtilityVM) RemoveVPMEM(ctx context.Context, hostPath string) (err err
 
 	device := uvm.vpmemDevices[deviceNumber]
 	if device.refCount == 1 {
-		modification := &hcsschema.ModifySettingRequest{
+		guestReq := guestrequest.GuestRequest{
+			ResourceType: guestrequest.ResourceTypeVPMemDevice,
 			RequestType:  requesttype.Remove,
-			ResourcePath: fmt.Sprintf(vPMemControllerResourceFormat, deviceNumber),
-			GuestRequest: guestrequest.GuestRequest{
-				ResourceType: guestrequest.ResourceTypeVPMemDevice,
-				RequestType:  requesttype.Remove,
-				Settings: guestrequest.LCOWMappedVPMemDevice{
-					DeviceNumber: deviceNumber,
-					MountPath:    device.uvmPath,
-				},
+			Settings: guestrequest.LCOWMappedVPMemDevice{
+				DeviceNumber: deviceNumber,
+				MountPath:    device.uvmPath,
 			},
 		}
 
-		if err := uvm.modify(ctx, modification); err != nil {
-			return fmt.Errorf("failed to remove VPMEM %s from utility VM %s: %s", hostPath, uvm.id, err)
+		if err := uvm.GuestRequest(ctx, guestReq); err != nil {
+			return errors.Wrap(err, "failed guest request to remove vpmem disk")
 		}
+
+		if err := uvm.u.RemoveVPMemDevice(ctx, deviceNumber, hostPath); err != nil {
+			return errors.Wrapf(err, "failed to remove VPMEM %s from utility VM %s", hostPath, uvm.ID())
+		}
+
 		log.G(ctx).WithFields(logrus.Fields{
 			"hostPath":     device.hostPath,
 			"uvmPath":      device.uvmPath,

@@ -36,6 +36,17 @@ func (uvm *utilityVM) AddVPMemDevice(ctx context.Context, id uint32, path string
 	}
 }
 
+func (uvm *utilityVM) RemoveVPMemDevice(ctx context.Context, id uint32, path string) error {
+	if uvm.state != vm.StateRunning {
+		return vm.ErrNotInRunningState
+	}
+	request := &hcsschema.ModifySettingRequest{
+		RequestType:  requesttype.Remove,
+		ResourcePath: fmt.Sprintf("VirtualMachine/Devices/VirtualPMem/Devices/%d", id),
+	}
+	return uvm.cs.Modify(ctx, request)
+}
+
 func (uvm *utilityVM) addVPMemDevicePreCreated(ctx context.Context, id uint32, path string, readOnly bool, imageFormat vm.VPMemImageFormat) error {
 	if uvm.doc.VirtualMachine.Devices.VirtualPMem == nil {
 		return errors.New("VPMem controller has not been added")
@@ -53,6 +64,9 @@ func (uvm *utilityVM) addVPMemDevicePreCreated(ctx context.Context, id uint32, p
 }
 
 func (uvm *utilityVM) addVPMemDeviceCreatedRunning(ctx context.Context, id uint32, path string, readOnly bool, imageFormat vm.VPMemImageFormat) error {
+	if uvm.state != vm.StateRunning {
+		return vm.ErrNotInRunningState
+	}
 	imageFormatString, err := getVPMemImageFormatString(imageFormat)
 	if err != nil {
 		return err

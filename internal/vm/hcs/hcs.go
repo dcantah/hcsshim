@@ -2,6 +2,7 @@ package hcs
 
 import (
 	"context"
+	"sync"
 
 	"github.com/Microsoft/go-winio/pkg/guid"
 	"github.com/Microsoft/hcsshim/internal/hcs"
@@ -9,6 +10,7 @@ import (
 	"github.com/Microsoft/hcsshim/internal/schemaversion"
 	"github.com/Microsoft/hcsshim/internal/vm"
 	"github.com/pkg/errors"
+	"golang.org/x/sys/windows"
 )
 
 type hcsSource struct{}
@@ -55,11 +57,14 @@ func (s *hcsSource) NewWindowsUVM(ctx context.Context, id, owner string) (vm.UVM
 }
 
 type utilityVM struct {
-	id    string
-	state vm.State
-	doc   *hcsschema.ComputeSystem
-	cs    *hcs.System
-	vmID  guid.GUID
+	id           string
+	state        vm.State
+	doc          *hcsschema.ComputeSystem
+	cs           *hcs.System
+	vmmemProcess windows.Handle
+	vmmemErr     error
+	vmmemOnce    sync.Once
+	vmID         guid.GUID
 }
 
 func (uvm *utilityVM) ID() string {

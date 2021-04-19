@@ -35,9 +35,10 @@ func (uvm *remoteVM) AddSCSIDisk(ctx context.Context, controller uint32, lun uin
 		ReadOnly:   readOnly,
 	}
 
-	if uvm.state == vm.StateCreated {
+	switch uvm.state {
+	case vm.StatePreCreated:
 		uvm.config.DevicesConfig.ScsiDisks = append(uvm.config.DevicesConfig.ScsiDisks, disk)
-	} else if uvm.state == vm.StateRunning {
+	case vm.StateRunning:
 		if _, err := uvm.client.ModifyResource(ctx,
 			&vmservice.ModifyResourceRequest{
 				Type: vmservice.ModifyType_ADD,
@@ -48,8 +49,33 @@ func (uvm *remoteVM) AddSCSIDisk(ctx context.Context, controller uint32, lun uin
 		); err != nil {
 			return errors.Wrap(err, "failed to add SCSI disk")
 		}
-	} else {
-		return errors.New("VM is not in created or running state")
+	default:
+		return errors.New("VM is not in pre-created or running state")
+	}
+
+	return nil
+}
+
+func (uvm *remoteVM) RemoveSCSIDisk(ctx context.Context, controller uint32, lun uint32, path string) error {
+	if uvm.state != vm.StateRunning {
+		return vm.ErrNotInRunningState
+	}
+
+	disk := &vmservice.SCSIDisk{
+		Controller: controller,
+		Lun:        lun,
+		HostPath:   path,
+	}
+
+	if _, err := uvm.client.ModifyResource(ctx,
+		&vmservice.ModifyResourceRequest{
+			Type: vmservice.ModifyType_REMOVE,
+			Resource: &vmservice.ModifyResourceRequest_ScsiDisk{
+				ScsiDisk: disk,
+			},
+		},
+	); err != nil {
+		return errors.Wrapf(err, "failed to remove SCSI disk %q", path)
 	}
 
 	return nil

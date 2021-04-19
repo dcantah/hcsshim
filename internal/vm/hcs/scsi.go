@@ -28,13 +28,24 @@ func (uvm *utilityVM) AddSCSIDisk(ctx context.Context, controller uint32, lun ui
 	switch uvm.state {
 	case vm.StatePreCreated:
 		return uvm.addSCSIDiskPreCreated(ctx, controller, lun, path, typ, readOnly)
-	case vm.StateCreated:
-		fallthrough
 	case vm.StateRunning:
 		return uvm.addSCSIDiskCreatedRunning(ctx, controller, lun, path, typ, readOnly)
 	default:
 		return fmt.Errorf("VM is not in valid state for this operation: %d", uvm.state)
 	}
+}
+
+func (uvm *utilityVM) RemoveSCSIDisk(ctx context.Context, controller uint32, lun uint32, path string) error {
+	if uvm.state != vm.StateRunning {
+		return vm.ErrNotInRunningState
+	}
+
+	request := &hcsschema.ModifySettingRequest{
+		RequestType:  requesttype.Remove,
+		ResourcePath: fmt.Sprintf("VirtualMachine/Devices/Scsi/%d/Attachments/%d", controller, lun),
+	}
+
+	return uvm.cs.Modify(ctx, request)
 }
 
 func (uvm *utilityVM) addSCSIDiskPreCreated(ctx context.Context, controller uint32, lun uint32, path string, typ vm.SCSIDiskType, readOnly bool) error {

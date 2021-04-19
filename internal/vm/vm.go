@@ -5,7 +5,7 @@ import (
 	"errors"
 	"net"
 
-	"github.com/Microsoft/go-winio/pkg/guid"
+	"github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/stats"
 )
 
 var (
@@ -64,6 +64,10 @@ type UVM interface {
 	// to unblock.
 	Wait() error
 
+	// Stats returns statistics about the Utility VM. This includes things like assigned memory, available memory,
+	// processor runtime etc.
+	Stats(ctx context.Context) (*stats.VirtualMachineStatistics, error)
+
 	// ExitError will return any error if the Utility VM exited unexpectedly, or if the Utility VM experienced an
 	// error after Wait returned, it will return the wait error.
 	ExitError() error
@@ -108,6 +112,7 @@ type BootManager interface {
 type SCSIManager interface {
 	AddSCSIController(ctx context.Context, id uint32) error
 	AddSCSIDisk(ctx context.Context, controller uint32, lun uint32, path string, typ SCSIDiskType, readOnly bool) error
+	RemoveSCSIDisk(ctx context.Context, controller uint32, lun uint32, path string) error
 }
 
 type VPMemImageFormat uint8
@@ -120,20 +125,28 @@ const (
 type VPMemManager interface {
 	AddVPMemController(ctx context.Context, maximumDevices uint32, maximumSizeBytes uint64) error
 	AddVPMemDevice(ctx context.Context, id uint32, path string, readOnly bool, imageFormat VPMemImageFormat) error
+	RemoveVPMemDevice(ctx context.Context, id uint32, path string) error
 }
 
 type NetworkManager interface {
 	AddNIC(ctx context.Context, nicID string, endpointID string, macAddr string) error
+	RemoveNIC(ctx context.Context, nicID string, endpointID string, macAddr string) error
 }
 
-// Stub for now, don't know what we need for Linux
+// TODO dcantah: Stub for now, don't know what we need for Linux
 type PCIManager interface {
 	AddDevice(ctx context.Context) error
 }
 
+type VMSocketType uint8
+
+const (
+	HvSocket VMSocketType = iota
+	VSock
+)
+
 type VMSocketManager interface {
-	HVSocketListen(ctx context.Context, serviceID guid.GUID) (net.Listener, error)
-	VSockListen(ctx context.Context, port uint32) (net.Listener, error)
+	VMSocketListen(ctx context.Context, socketType VMSocketType, connID interface{}) (net.Listener, error)
 }
 
 type MemoryManager interface {

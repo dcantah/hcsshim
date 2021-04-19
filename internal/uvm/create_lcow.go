@@ -383,11 +383,6 @@ func CreateLCOW(ctx context.Context, opts *OptionsLCOW) (_ *UtilityVM, err error
 		}
 	}
 
-	// fullDoc, err := mergemaps.MergeJSON(doc, ([]byte)(opts.AdditionHCSDocumentJSON))
-	// if err != nil {
-	// 	return nil, fmt.Errorf("failed to merge additional JSON '%s': %s", opts.AdditionHCSDocumentJSON, err)
-	// }
-
 	if err := uvm.u.Create(ctx); err != nil {
 		return nil, errors.Wrap(err, "failed to create virtual machine")
 	}
@@ -432,5 +427,5 @@ func CreateLCOW(ctx context.Context, opts *OptionsLCOW) (_ *UtilityVM, err error
 }
 
 func (uvm *UtilityVM) listenVsock(ctx context.Context, port uint32) (net.Listener, error) {
-	return uvm.u.HVSocketListen(ctx, winio.VsockServiceID(port))
+	return uvm.u.VMSocketListen(ctx, vm.HvSocket, winio.VsockServiceID(port))
 }

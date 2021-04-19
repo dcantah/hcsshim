@@ -19,6 +19,7 @@ import (
 	"github.com/Microsoft/hcsshim/internal/logfields"
 	"github.com/Microsoft/hcsshim/internal/requesttype"
 	hcsschema "github.com/Microsoft/hcsshim/internal/schema2"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
@@ -249,7 +250,7 @@ func (uvm *UtilityVM) Start(ctx context.Context) (err error) {
 
 		// initial setup required for external GCS connection
 		if err = uvm.configureHvSocketForGCS(ctx); err != nil {
-			return fmt.Errorf("failed to do initial GCS setup: %s", err)
+			return errors.Wrap(err, "failed to do initial GCS setup")
 		}
 	} else {
 		// // Cache the guest connection properties.
