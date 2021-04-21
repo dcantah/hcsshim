@@ -20,7 +20,8 @@ import (
 type source struct {
 	// Path to the binary to launch
 	binary string
-	addr   string
+	// Address of the server process implementing the vmservice interface.
+	addr string
 }
 
 func NewSource(binary, addr string) (vm.UVMSource, error) {
@@ -31,6 +32,7 @@ func NewSource(binary, addr string) (vm.UVMSource, error) {
 }
 
 func (s *source) NewLinuxUVM(ctx context.Context, id, owner string) (vm.UVM, error) {
+	var job *jobobject.JobObject
 	if s.binary != "" {
 		log.G(ctx).WithFields(logrus.Fields{
 			"binary":  s.binary,
@@ -45,7 +47,7 @@ func (s *source) NewLinuxUVM(ctx context.Context, id, owner string) (vm.UVM, err
 			return nil, errors.Wrap(err, "failed to create job object for remotevm process")
 		}
 
-		// TODO dcantah: This expects the remotevm server process to have a ttrpc flag. Revisit this later
+		// This expects the remotevm server process to have a ttrpc flag. Possibly revisit this.s
 		cmd := exec.Command(s.binary, "--ttrpc", s.addr)
 		p, err := cmd.StdoutPipe()
 		if err != nil {
@@ -68,6 +70,7 @@ func (s *source) NewLinuxUVM(ctx context.Context, id, owner string) (vm.UVM, err
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to open nul file")
 		}
+
 		// Wait for stdout to close. This is our signal that the server is successfully up and running.
 		_, _ = io.Copy(f, p)
 	}
@@ -86,8 +89,10 @@ func (s *source) NewLinuxUVM(ctx context.Context, id, owner string) (vm.UVM, err
 			MemoryConfig:    &vmservice.MemoryConfig{},
 			DevicesConfig:   &vmservice.DevicesConfig{},
 			ProcessorConfig: &vmservice.ProcessorConfig{},
+			SerialConfig:    &vmservice.SerialConfig{},
 			ExtraData:       make(map[string]string),
 		},
+		job:    job,
 		client: vmClient,
 	}, nil
 }
@@ -100,6 +105,7 @@ type remoteVM struct {
 	id        string
 	state     vm.State
 	waitError error
+	job       *jobobject.JobObject
 	config    *vmservice.VMConfig
 	client    vmservice.VMService
 }

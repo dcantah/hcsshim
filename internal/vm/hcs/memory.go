@@ -1,12 +1,10 @@
 package hcs
 
 import (
-	"context"
-
 	"github.com/Microsoft/hcsshim/internal/vm"
 )
 
-func (uvm *utilityVM) SetMemoryLimit(ctx context.Context, memoryMB uint64) error {
+func (uvm *utilityVM) SetMemoryLimit(memoryMB uint64) error {
 	if uvm.state != vm.StatePreCreated {
 		return vm.ErrNotInPreCreatedState
 	}
@@ -14,7 +12,7 @@ func (uvm *utilityVM) SetMemoryLimit(ctx context.Context, memoryMB uint64) error
 	return nil
 }
 
-func (uvm *utilityVM) SetMemoryConfig(ctx context.Context, config *vm.MemoryConfig) error {
+func (uvm *utilityVM) SetMemoryConfig(config *vm.MemoryConfig) error {
 	if uvm.state != vm.StatePreCreated {
 		return vm.ErrNotInPreCreatedState
 	}
@@ -27,7 +25,7 @@ func (uvm *utilityVM) SetMemoryConfig(ctx context.Context, config *vm.MemoryConf
 	return nil
 }
 
-func (uvm *utilityVM) SetMMIOConfig(ctx context.Context, lowGapMB uint64, highBaseMB uint64, highGapMB uint64) error {
+func (uvm *utilityVM) SetMMIOConfig(lowGapMB uint64, highBaseMB uint64, highGapMB uint64) error {
 	if uvm.state != vm.StatePreCreated {
 		return vm.ErrNotInPreCreatedState
 	}

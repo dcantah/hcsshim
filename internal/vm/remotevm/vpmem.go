@@ -6,7 +6,7 @@ import (
 	"github.com/Microsoft/hcsshim/internal/vm"
 )
 
-func (uvm *remoteVM) AddVPMemController(ctx context.Context, maximumDevices uint32, maximumSizeBytes uint64) error {
+func (uvm *remoteVM) AddVPMemController(maximumDevices uint32, maximumSizeBytes uint64) error {
 	return vm.ErrNotSupported
 }
 

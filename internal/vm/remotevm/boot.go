@@ -1,16 +1,13 @@
 package remotevm
 
 import (
-	"context"
-
 	"github.com/Microsoft/hcsshim/internal/vm"
 	"github.com/Microsoft/hcsshim/internal/vmservice"
-	"github.com/pkg/errors"
 )
 
-func (uvm *remoteVM) SetLinuxKernelDirectBoot(ctx context.Context, kernel string, initRD string, cmd string) error {
+func (uvm *remoteVM) SetLinuxKernelDirectBoot(kernel string, initRD string, cmd string) error {
 	if uvm.state != vm.StatePreCreated {
-		return errors.New("VM is not in pre-created state")
+		return vm.ErrNotInPreCreatedState
 	}
 	if uvm.config.BootConfig != nil {
 		return vm.ErrAlreadySet
@@ -25,7 +22,6 @@ func (uvm *remoteVM) SetLinuxKernelDirectBoot(ctx context.Context, kernel string
 	return nil
 }
 
-func (uvm *remoteVM) SetUEFIBoot(ctx context.Context, dir string, path string, args string) error {
-	// TODO: dcantah
+func (uvm *remoteVM) SetUEFIBoot(dir string, path string, args string) error {
 	return vm.ErrNotSupported
 }

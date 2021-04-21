@@ -12,7 +12,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func (uvm *utilityVM) AddVPMemController(ctx context.Context, maximumDevices uint32, maximumSizeBytes uint64) error {
+func (uvm *utilityVM) AddVPMemController(maximumDevices uint32, maximumSizeBytes uint64) error {
 	if uvm.state != vm.StatePreCreated {
 		return vm.ErrNotInPreCreatedState
 	}
@@ -28,8 +28,6 @@ func (uvm *utilityVM) AddVPMemDevice(ctx context.Context, id uint32, path string
 	switch uvm.state {
 	case vm.StatePreCreated:
 		return uvm.addVPMemDevicePreCreated(ctx, id, path, readOnly, imageFormat)
-	case vm.StateCreated:
-		fallthrough
 	case vm.StateRunning:
 		return uvm.addVPMemDeviceCreatedRunning(ctx, id, path, readOnly, imageFormat)
 	default:
@@ -65,9 +63,6 @@ func (uvm *utilityVM) addVPMemDevicePreCreated(ctx context.Context, id uint32, p
 }
 
 func (uvm *utilityVM) addVPMemDeviceCreatedRunning(ctx context.Context, id uint32, path string, readOnly bool, imageFormat vm.VPMemImageFormat) error {
-	if uvm.state != vm.StateRunning {
-		return vm.ErrNotInRunningState
-	}
 	imageFormatString, err := getVPMemImageFormatString(imageFormat)
 	if err != nil {
 		return err

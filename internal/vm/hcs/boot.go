@@ -1,15 +1,13 @@
 package hcs
 
 import (
-	"context"
-
 	hcsschema "github.com/Microsoft/hcsshim/internal/schema2"
 	"github.com/Microsoft/hcsshim/internal/vm"
 	"github.com/Microsoft/hcsshim/osversion"
 	"github.com/pkg/errors"
 )
 
-func (uvm *utilityVM) SetUEFIBoot(ctx context.Context, dir string, path string, args string) error {
+func (uvm *utilityVM) SetUEFIBoot(dir string, path string, args string) error {
 	if uvm.state != vm.StatePreCreated {
 		return vm.ErrNotInPreCreatedState
 	}
@@ -24,7 +22,7 @@ func (uvm *utilityVM) SetUEFIBoot(ctx context.Context, dir string, path string, 
 	return nil
 }
 
-func (uvm *utilityVM) SetLinuxKernelDirectBoot(ctx context.Context, kernel string, initRD string, cmd string) error {
+func (uvm *utilityVM) SetLinuxKernelDirectBoot(kernel string, initRD string, cmd string) error {
 	if uvm.state != vm.StatePreCreated {
 		return vm.ErrNotInPreCreatedState
 	}

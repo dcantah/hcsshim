@@ -178,6 +178,7 @@ func CreateLCOW(ctx context.Context, opts *OptionsLCOW) (_ *UtilityVM, err error
 	if _, err := os.Stat(kernelFullPath); os.IsNotExist(err) {
 		return nil, fmt.Errorf("kernel: '%s' not found", kernelFullPath)
 	}
+
 	rootfsFullPath := filepath.Join(opts.BootFilesPath, opts.RootFSFile)
 	if _, err := os.Stat(rootfsFullPath); os.IsNotExist(err) {
 		return nil, fmt.Errorf("boot file: '%s' not found", rootfsFullPath)
@@ -192,12 +193,12 @@ func CreateLCOW(ctx context.Context, opts *OptionsLCOW) (_ *UtilityVM, err error
 		return nil, fmt.Errorf("failed to get host processor information: %s", err)
 	}
 
-	var s vm.UVMSource
+	var source vm.UVMSource
 	switch opts.VMSource {
 	case vm.HCS:
-		s = hcs.NewSource()
+		source = hcs.NewSource()
 	case vm.RemoteVM:
-		s, err = remotevm.NewSource(opts.VMServicePath, opts.VMServiceAddress)
+		source, err = remotevm.NewSource(opts.VMServicePath, opts.VMServiceAddress)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to create VM source")
 		}
@@ -205,7 +206,7 @@ func CreateLCOW(ctx context.Context, opts *OptionsLCOW) (_ *UtilityVM, err error
 		return nil, fmt.Errorf("unknown VM source: %s", opts.VMSource)
 	}
 
-	uvm.u, err = s.NewLinuxUVM(ctx, opts.ID, uvm.owner)
+	uvm.u, err = source.NewLinuxUVM(ctx, opts.ID, uvm.owner)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create new VM")
 	}
@@ -223,7 +224,7 @@ func CreateLCOW(ctx context.Context, opts *OptionsLCOW) (_ *UtilityVM, err error
 	// Align the requested memory size.
 	memorySizeInMB := uvm.normalizeMemorySize(ctx, opts.MemorySizeInMB)
 
-	if err := uvm.u.SetMemoryLimit(ctx, memorySizeInMB); err != nil {
+	if err := uvm.u.SetMemoryLimit(memorySizeInMB); err != nil {
 		return nil, errors.Wrap(err, "failed to set memory limit")
 	}
 
@@ -231,7 +232,7 @@ func CreateLCOW(ctx context.Context, opts *OptionsLCOW) (_ *UtilityVM, err error
 	if !opts.AllowOvercommit {
 		backingType = vm.MemoryBackingTypePhysical
 	}
-	if err := uvm.u.SetMemoryConfig(ctx, &vm.MemoryConfig{
+	if err := uvm.u.SetMemoryConfig(&vm.MemoryConfig{
 		BackingType:     backingType,
 		DeferredCommit:  opts.EnableDeferredCommit,
 		ColdDiscardHint: opts.EnableColdDiscardHint,
@@ -244,37 +245,22 @@ func CreateLCOW(ctx context.Context, opts *OptionsLCOW) (_ *UtilityVM, err error
 	}
 
 	// Handle StorageQoS if set
-	// if opts.StorageQoSBandwidthMaximum > 0 || opts.StorageQoSIopsMaximum > 0 {
-	// 	doc.VirtualMachine.StorageQoS = &hcsschema.StorageQoS{
-	// 		IopsMaximum:      opts.StorageQoSIopsMaximum,
-	// 		BandwidthMaximum: opts.StorageQoSBandwidthMaximum,
-	// 	}
-	// }
-
-	// if opts.UseGuestConnection && !opts.ExternalGuestConnection {
-	// 	doc.VirtualMachine.GuestConnection = &hcsschema.GuestConnection{
-	// 		UseVsock:            true,
-	// 		UseConnectedSuspend: true,
-	// 	}
-	// }
+	if opts.StorageQoSBandwidthMaximum > 0 || opts.StorageQoSIopsMaximum > 0 {
+		if err := uvm.u.SetStorageQos(int64(opts.StorageQoSIopsMaximum), int64(opts.StorageQoSBandwidthMaximum)); err != nil {
+			return nil, errors.Wrap(err, "failed to set storage qos config")
+		}
+	}
 
 	if uvm.scsiControllerCount > 0 {
-		// TODO: JTERRY75 - this should enumerate scsicount and add an entry per value.
-		if err := uvm.u.AddSCSIController(ctx, 0); err != nil {
-			return nil, errors.Wrap(err, "failed to add scsi controller")
+		for i := 0; i < int(uvm.scsiControllerCount); i++ {
+			if err := uvm.u.AddSCSIController(uint32(i)); err != nil {
+				return nil, errors.Wrap(err, "failed to add scsi controller")
+			}
 		}
-		// doc.VirtualMachine.Devices.Scsi = map[string]hcsschema.Scsi{
-		// 	"0": {
-		// 		Attachments: make(map[string]hcsschema.Attachment),
-		// 	},
-		// }
 	}
+
 	if uvm.vpmemMaxCount > 0 {
-		// doc.VirtualMachine.Devices.VirtualPMem = &hcsschema.VirtualPMemController{
-		// 	MaximumCount:     uvm.vpmemMaxCount,
-		// 	MaximumSizeBytes: uvm.vpmemMaxSizeBytes,
-		// }
-		if err := uvm.u.AddVPMemController(ctx, uvm.vpmemMaxCount, uvm.vpmemMaxSizeBytes); err != nil {
+		if err := uvm.u.AddVPMemController(uvm.vpmemMaxCount, uvm.vpmemMaxSizeBytes); err != nil {
 			return nil, errors.Wrap(err, "failed to add VPMem controller")
 		}
 	}
@@ -292,16 +278,11 @@ func CreateLCOW(ctx context.Context, opts *OptionsLCOW) (_ *UtilityVM, err error
 		if strings.ToLower(filepath.Ext(opts.RootFSFile)) == "vhdx" {
 			imageFormat = vm.VPMemImageFormatVHDX
 		}
+
 		if err := uvm.u.AddVPMemDevice(ctx, 0, rootfsFullPath, true, imageFormat); err != nil {
 			return nil, errors.Wrap(err, "failed to add vpmem disk")
 		}
-		// doc.VirtualMachine.Devices.VirtualPMem.Devices = map[string]hcsschema.VirtualPMemDevice{
-		// 	"0": {
-		// 		HostPath:    rootfsFullPath,
-		// 		ReadOnly:    true,
-		// 		ImageFormat: imageFormat,
-		// 	},
-		// }
+
 		// Add to our internal structure
 		uvm.vpmemDevices[0] = &vpmemInfo{
 			hostPath: opts.RootFSFile,
@@ -314,21 +295,11 @@ func CreateLCOW(ctx context.Context, opts *OptionsLCOW) (_ *UtilityVM, err error
 	if opts.ConsolePipe != "" {
 		vmDebugging = true
 		kernelArgs += " 8250_core.nr_uarts=1 8250_core.skip_txen_test=1 console=ttyS0,115200"
-		// doc.VirtualMachine.Devices.ComPorts = map[string]hcsschema.ComPort{
-		// 	"0": { // Which is actually COM1
-		// 		NamedPipe: opts.ConsolePipe,
-		// 	},
-		// }
+		if err := uvm.u.SetSerialConsole(0, opts.ConsolePipe); err != nil {
+			return nil, errors.Wrap(err, "failed to add serial console config")
+		}
 	} else {
 		kernelArgs += " 8250_core.nr_uarts=0"
-	}
-
-	if opts.EnableGraphicsConsole {
-		vmDebugging = true
-		kernelArgs += " console=tty"
-		// doc.VirtualMachine.Devices.Keyboard = &hcsschema.Keyboard{}
-		// doc.VirtualMachine.Devices.EnhancedModeVideo = &hcsschema.EnhancedModeVideo{}
-		// doc.VirtualMachine.Devices.VideoMonitor = &hcsschema.VideoMonitor{}
 	}
 
 	if !vmDebugging {
@@ -374,11 +345,11 @@ func CreateLCOW(ctx context.Context, opts *OptionsLCOW) (_ *UtilityVM, err error
 		if opts.PreferredRootFSType == PreferredRootFSTypeInitRd {
 			initFS = rootfsFullPath
 		}
-		if err := uvm.u.SetLinuxKernelDirectBoot(ctx, kernelFullPath, initFS, kernelArgs); err != nil {
+		if err := uvm.u.SetLinuxKernelDirectBoot(kernelFullPath, initFS, kernelArgs); err != nil {
 			return nil, errors.Wrap(err, "failed to set Linux kernel direct boot")
 		}
 	} else {
-		if err := uvm.u.SetUEFIBoot(ctx, opts.BootFilesPath, opts.KernelFile, kernelArgs); err != nil {
+		if err := uvm.u.SetUEFIBoot(opts.BootFilesPath, opts.KernelFile, kernelArgs); err != nil {
 			return nil, errors.Wrap(err, "failed to set UEFI boot")
 		}
 	}

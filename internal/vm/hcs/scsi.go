@@ -12,7 +12,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func (uvm *utilityVM) AddSCSIController(ctx context.Context, id uint32) error {
+func (uvm *utilityVM) AddSCSIController(id uint32) error {
 	if uvm.state != vm.StatePreCreated {
 		return vm.ErrNotInPreCreatedState
 	}

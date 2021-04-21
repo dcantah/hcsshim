@@ -9,8 +9,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func (uvm *remoteVM) AddSCSIController(ctx context.Context, id uint32) error {
-	// TODO: dcantah
+func (uvm *remoteVM) AddSCSIController(id uint32) error {
 	return nil
 }
 
