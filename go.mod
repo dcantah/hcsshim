@@ -3,13 +3,13 @@ module github.com/Microsoft/hcsshim
 go 1.13
 
 require (
-	github.com/Microsoft/go-winio v0.4.17-0.20210211115548-6eac466e5fa3
-	github.com/containerd/cgroups v0.0.0-20210114181951-8a68de567b68
-	github.com/containerd/console v1.0.1
-	github.com/containerd/containerd v1.5.0-beta.4
-	github.com/containerd/go-runc v0.0.0-20201020171139-16b287bc67d0
+	github.com/Microsoft/go-winio v0.4.17
+	github.com/containerd/cgroups v1.0.1
+	github.com/containerd/console v1.0.2
+	github.com/containerd/containerd v1.5.1
+	github.com/containerd/go-runc v1.0.0
 	github.com/containerd/ttrpc v1.0.2
-	github.com/containerd/typeurl v1.0.1
+	github.com/containerd/typeurl v1.0.2
 	github.com/gogo/protobuf v1.3.2
 	github.com/linuxkit/virtsock v0.0.0-20201010232012-f8cee7dfc7a3
 	github.com/mattn/go-shellwords v1.0.3
